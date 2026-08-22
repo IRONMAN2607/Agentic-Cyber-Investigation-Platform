@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data: artifacts are potentially malicious, never commit them
+data/
+!data/.gitkeep
+
+# Datasets are large and often licence-restricted; commit manifests only
+datasets/**/raw/
+datasets/**/*.pcap
+datasets/**/*.csv
+
+# Frontend
+node_modules/
+web/dist/
+
+# OS
+.DS_Store
+Thumbs.db

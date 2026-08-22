@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(mkdir -p src/acip data)",
+      "Bash(touch data/.gitkeep)",
+      "Bash(.venv/Scripts/python.exe -m pip install --quiet -e \".[dev]\")",
+      "Bash(.venv/Scripts/python.exe -c \"import fastapi,sqlalchemy,jwt,argon2,pydantic_settings; print\\('imports ok'\\)\")",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(python -m pytest --version)",
+      "Bash(python -m ruff --version)",
+      "Bash(python -m mypy --version)",
+      "Bash(.venv/Scripts/python.exe -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pytest --version)",
+      "Bash(.venv/Scripts/ruff.exe --version)",
+      "Bash(.venv/Scripts/mypy.exe --version)",
+      "Bash(.venv/Scripts/python.exe -c \"import pytest_asyncio, httpx, argon2, jwt, acip; print\\('deps ok', acip.__version__\\)\")"
+    ]
+  }
+}
