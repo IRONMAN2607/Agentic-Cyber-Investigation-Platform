@@ -3,7 +3,10 @@
 **Current state: 111 tests passing.** The full test suite covers `unit/`, `integration/`, `api/`, `security/`, and `scenarios/`, verifying grounding invariants G0–G4, append-only immutability, provenance integrity, recovery semantics, and the complete M1 vertical slice.
 
 That is stated first because §1 is the project's governing rule: never claim something works without
-having verified it. Every claim in `docs/` is verified against live test suites and actual end-to-end execution.
+having verified it. That cuts both ways: the suite below is real and was run, and the gaps in
+[roadmap.md](roadmap.md) §3.1 are real too. Four Phase 1′ criteria remain open — an atomic start
+claim, a backup/restore integrity check, retention disclosure in the report, and the operating
+boundary in the capability output — and no document here should be read as covering them.
 
 ## 1. What the fixtures already commit us to
 

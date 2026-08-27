@@ -1,0 +1,48 @@
+# Local gates that run before a commit exists, so CI is a second opinion rather
+# than the first. Install with `pre-commit install`.
+#
+# Generated artefacts are excluded globally: graphify-out/ is machine output
+# refreshed by `graphify update .`, and data/ holds potentially malicious
+# artifacts that must never be rewritten by a formatting hook.
+exclude: '^(graphify-out/|data/|web/dist/|\.secrets\.baseline$|uv\.lock$)'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-case-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  # The secret scan required by roadmap.md §3 criterion 12. The baseline records
+  # the placeholders and test credentials that are meant to be in the tree; a
+  # finding outside it fails the commit. Refresh with:
+  #   detect-secrets scan --baseline .secrets.baseline
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+
+  # Ruff runs from the project environment rather than a pinned mirror, so the
+  # version enforced here is the one uv.lock resolves and CI runs. One version
+  # of the linter, three places it can fail.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true

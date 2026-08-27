@@ -51,6 +51,7 @@ from acip.db.models import (
     TaskRun,
     ToolRun,
 )
+from acip.core.security.ratelimit import investigation_limiter, rate_limit
 from acip.db.session import authorized_purge
 from acip.errors import ConflictError, NotFoundError
 from acip.logging import get_logger
@@ -68,7 +69,12 @@ router = APIRouter(prefix="/investigations", tags=["investigations"])
 _UPLOAD_CHUNK = 64 * 1024
 
 
-@router.post("", response_model=InvestigationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=InvestigationResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit(investigation_limiter))],
+)
 async def create_investigation(
     payload: InvestigationCreate,
     user: Investigator,
@@ -296,6 +302,7 @@ async def create_task(
     "/{investigation_id}/artifacts",
     response_model=ArtifactResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit(investigation_limiter))],
 )
 async def upload_artifact(
     investigation: LoadedInvestigation,
@@ -360,7 +367,11 @@ async def upload_artifact(
     return ArtifactResponse.model_validate(artifact)
 
 
-@router.post("/{investigation_id}/start", response_model=StartResponse)
+@router.post(
+    "/{investigation_id}/start",
+    response_model=StartResponse,
+    dependencies=[Depends(rate_limit(investigation_limiter))],
+)
 async def start_investigation(
     investigation: LoadedInvestigation,
     user: Investigator,

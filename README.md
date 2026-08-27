@@ -20,7 +20,11 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 
 ## Status
 
-**Current phase: Phase 1 (Foundation & Vertical Slice) — Complete and Fully Verified.**
+**Phases 0–3 verified. Phase 1′ (verification retrofit) substantially complete — 11 of its 15 exit
+criteria met. Phase 4 next.** [docs/roadmap.md](docs/roadmap.md) is the authority on phase numbering
+and §3.1 there marks every criterion individually; the four open ones are an atomic start claim, a
+backup/restore integrity check, retention disclosure in the report, and the operating boundary in the
+capability output.
 
 | Quality Gate | Status |
 |---|---|
@@ -28,7 +32,8 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 | Lint | **0 ruff errors** (`ruff check src tests`) |
 | Types | **0 mypy errors** across 54 source files (`mypy src`) |
 | Vertical slice | **100% verified end to end** with SQLite database, real auth log attacks, and clean log baselines |
-| Security Invariants | Grounding invariants G0–G4, immutability, token safety, role authz matrix, and no `shell=True` verified |
+| Security Invariants | Grounding invariants G0–G4, append-only immutability (incl. bulk DML), provenance integrity, token safety, role authz matrix, no `shell=True`, no reserved `LogRecord` keys |
+| Not yet wired | SSRF validation, T1 subprocess sandbox, MITRE/G7 mapping and the investigation rate limiter are implemented and unit-tested but reached by no request path; `core/limitations.py` declares them inactive so reports and `/capabilities` do not claim them |
 | Frontend | **Interactive dashboard** in `web/` served directly by FastAPI |
 
 `GET /capabilities` and `acip capabilities` report what this deployment can actually do, and

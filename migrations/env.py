@@ -62,7 +62,17 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+    """Run migrations in 'online' mode.
+
+    ``acip.db.migrate`` passes an already-open synchronous connection through
+    ``config.attributes``, because the application drives migrations from inside
+    a running event loop where ``asyncio.run`` would raise. The CLI path, which
+    owns no loop, still builds its own engine.
+    """
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        do_run_migrations(connection)
+        return
     asyncio.run(run_async_migrations())
 
 

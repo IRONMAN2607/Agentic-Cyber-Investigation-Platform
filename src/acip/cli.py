@@ -18,6 +18,7 @@ from acip import __version__
 from acip.bootstrap import bootstrap
 from acip.config import Settings, get_settings
 from acip.core.security.passwords import MIN_PASSWORD_LENGTH, hash_password
+from acip.db.migrate import upgrade_to_head
 from acip.db.models import User
 from acip.db.session import Database
 from acip.logging import configure_logging, get_logger
@@ -92,7 +93,7 @@ async def _create_user(settings: Settings, username: str, role: str, email: str 
 
     database = Database(settings.database_url, echo=settings.db_echo)
     try:
-        await database.create_all()
+        await upgrade_to_head(settings.database_url)
         async with database.session() as session:
             existing = await session.scalar(sa.select(User).where(User.username == username))
             if existing is not None:

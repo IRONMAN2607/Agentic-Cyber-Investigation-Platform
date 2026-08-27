@@ -1,46 +1,57 @@
 name: CI
 
+# Runs on every branch, not just main. The previous configuration fired only on
+# main and master, so a feature branch got no CI until it opened a pull request —
+# which is precisely when the feedback arrives too late to be cheap.
 on:
   push:
-    branches: [main, master]
+    branches: ["**"]
   pull_request:
-    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    name: Lint, Type Check & Test
+    name: Lint, Type Check, Test & Audit
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
 
     steps:
       - name: Checkout repository
+        # TODO: pin to a commit SHA, as setup-uv below is, once the digest is verified.
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      # uv is the single toolchain: `uv.lock` pins every transitive dependency,
+      # so CI installs the same versions a developer resolved rather than
+      # whatever `pip install .[dev]` finds on the day it runs. Reproducibility
+      # is a stated Phase 10 requirement, and it starts with the install step.
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          python-version: "3.12"
+          enable-cache: true
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install .[dev]
+      - name: Verify the lockfile matches pyproject.toml
+        run: uv lock --check
+
+      - name: Install dependencies from the lockfile
+        run: uv sync --locked --extra dev
 
       - name: Run ruff linter
-        run: |
-          ruff check src tests
+        run: uv run ruff check src tests
 
       - name: Run ruff formatter check
-        run: |
-          ruff format --check src tests
+        run: uv run ruff format --check src tests
 
       - name: Run mypy type checker
-        run: |
-          mypy src
+        run: uv run mypy src
 
       - name: Run pytest test suite
-        run: |
-          pytest --tb=short
+        run: uv run pytest --tb=short
+
+      # Gating, per roadmap.md §3 criterion 11. A known-vulnerable dependency is
+      # a finding, not a warning: this project's own threat model treats the
+      # supply chain as attack surface, so the build fails rather than annotates.
+      - name: Audit dependencies for known vulnerabilities
+        run: uv run pip-audit --strict --progress-spinner off

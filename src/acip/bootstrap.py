@@ -1,7 +1,7 @@
 """Application bootstrap.
 
-Creates the schema and, outside production, seeds an initial administrator so a
-fresh checkout is usable without manual SQL.
+Migrates the schema to head and, outside production, seeds an initial
+administrator so a fresh checkout is usable without manual SQL.
 
 The seed refuses to run in production. A default credential that reaches a
 deployed system is a real vulnerability, and "we documented that you should
@@ -14,6 +14,7 @@ import sqlalchemy as sa
 
 from acip.config import Settings
 from acip.core.security.passwords import hash_password
+from acip.db.migrate import upgrade_to_head
 from acip.db.models import User
 from acip.db.session import Database
 from acip.logging import get_logger
@@ -25,7 +26,7 @@ logger = get_logger(__name__)
 async def bootstrap(database: Database, settings: Settings) -> None:
     """Prepare storage and seed development data."""
     settings.ensure_directories()
-    await database.create_all()
+    await upgrade_to_head(database.url)
     if not settings.is_prod:
         await seed_admin(database, settings)
 

@@ -103,3 +103,28 @@ def test_no_reserved_logrecord_keys_in_log_extra() -> None:
                         )
 
     assert not violations, f"Reserved LogRecord keys passed to extra: {violations}"
+
+
+def test_no_metadata_create_all_in_src() -> None:
+    """The schema has one source of truth: the Alembic chain.
+
+    ``create_all`` was the second one. It built every test database, which meant
+    the migrations that build the real one were never executed by anything —
+    ``0003`` rewrote the evidence table's foreign keys and no test would have
+    noticed had the revision been wrong. The two happened to agree; nothing
+    made them agree. Reintroducing ``create_all`` restores that gap silently,
+    so it fails here instead.
+    """
+    src_root = Path("src/acip")
+    assert src_root.exists(), "src/acip directory not found"
+
+    violations: list[str] = []
+    for file_path in _get_python_files(src_root):
+        tree = ast.parse(file_path.read_text(encoding="utf-8"), filename=str(file_path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr == "create_all":
+                violations.append(f"{file_path}:{node.lineno} references create_all")
+
+    assert not violations, (
+        f"create_all bypasses the migration chain; use acip.db.migrate.upgrade_to_head: {violations}"
+    )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
@@ -12,10 +12,26 @@ from acip.api.app import create_app
 from acip.bootstrap import bootstrap
 from acip.config import Settings
 from acip.core.security.passwords import hash_password
+from acip.core.security.ratelimit import investigation_limiter, login_limiter
 from acip.core.security.tokens import create_access_token
 from acip.db.models import User
 from acip.db.session import Database
 from acip.types import Role
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiters() -> Iterator[None]:
+    """Rate limiters hold process-global state, so tests must not inherit it.
+
+    Without this, whether a test passes depends on how many requests the tests
+    before it made — the limiters are module-level singletons keyed by client IP,
+    and every test client presents the same one.
+    """
+    login_limiter.reset()
+    investigation_limiter.reset()
+    yield
+    login_limiter.reset()
+    investigation_limiter.reset()
 
 
 @pytest.fixture

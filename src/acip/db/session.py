@@ -23,7 +23,6 @@ from sqlalchemy.orm import ORMExecuteState
 from sqlalchemy.orm import Session as SyncSession
 from sqlalchemy.pool import StaticPool
 
-from acip.db.base import Base
 from acip.logging import get_logger
 
 logger = get_logger(__name__)
@@ -120,16 +119,10 @@ class Database:
     def engine(self) -> AsyncEngine:
         return self._engine
 
-    async def create_all(self) -> None:
-        """Create the schema.
-
-        M1 uses ``create_all`` deliberately: there is no deployed data yet, and
-        the schema changes substantially when PostgreSQL becomes mandatory in
-        Phase 5. Alembic is introduced there with a single baseline revision.
-        """
-        async with self._engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("schema ready", extra={"database": _redact(self.url)})
+    # No ``create_all``. The schema comes from the Alembic chain via
+    # :func:`acip.db.migrate.upgrade_to_head` and from nowhere else, so the
+    # migrations are exercised by every test rather than by a command nobody
+    # runs. See ``acip/db/migrate.py`` for why that matters.
 
     async def dispose(self) -> None:
         await self._engine.dispose()

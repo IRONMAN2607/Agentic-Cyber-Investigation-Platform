@@ -26,8 +26,8 @@ path rather than reimplemented as a comparison artefact.
 | 1 | Foundation: config, types, errors, logging, DB, auth, API skeleton | **verified** |
 | 2 | Evidence store, grounding invariants, tool layer, artifact intake | **verified** |
 | 3 | Agents, planner, orchestrator, runner, reporting | **verified** |
-| **1′** | **Verification retrofit** | **complete** (67 tests, CI, clean linter/mypy, live UI) |
-| 4 | Tool and knowledge expansion; sandboxing; hardening | **next session** |
+| **1′** | **Verification retrofit** | **substantially complete** — 11 of 15 exit criteria met (111 tests, clean ruff/mypy, live UI); see §3 |
+| 4 | Tool and knowledge expansion; sandboxing; hardening | **next**; some scaffolding landed early and is unwired — see §4 |
 | 5 | Evidence graph, correlation, PostgreSQL | not started |
 | 6 | Model abstraction and routing | not started |
 | 7 | Reasoning agents | not started |
@@ -35,9 +35,30 @@ path rather than reimplemented as a comparison artefact.
 | 9 | Evaluation | not started |
 | 10 | Writing | not started |
 
-"Unverified" is doing real work in that table. Roughly 6,200 lines exist across Phases 1–3, zero tests
-run against them, and the vertical slice has never been executed — the development database has never
-been created. Treating that code as done would mean building Phase 4 on an untested foundation.
+**"Verified" now means measured, and the measurement is stated here so this table can be checked
+rather than believed.** As of 2026-08-28, on commit `4c5bd35`:
+
+```text
+pytest                    111 passed
+ruff check src tests      All checks passed!
+ruff format --check       91 files already formatted
+mypy src                  Success: no issues found in 54 source files
+```
+
+The vertical slice does execute end to end — `tests/scenarios/test_auth_log_scenario.py` runs create →
+upload → start → agents → evidence → findings → report against the auth-log fixture, with a clean-log
+negative baseline beside it. `data/acip.db` exists and is stamped at `0003_evidence_provenance_restrict`.
+
+**Earlier revisions of this section claimed the opposite** — "zero tests run against them", "the
+development database has never been created" — and that text survived long after it stopped being
+true. It is recorded here rather than quietly deleted because a status document that lags its own
+project is worse than no status document: it is the one file a reader trusts to know what is real.
+Re-derive these figures from a live run before citing them.
+
+What remains open in Phase 1′ is enumerated in §3 with each criterion marked. The four unmet ones are
+an atomic start claim, a backup/restore integrity check, retention disclosure in the report, and the
+supply-chain and pre-commit gates. None of them block Phase 4; all of them are Phase 1′ debt that is
+now tracked rather than assumed closed.
 
 ## 2. Delivery scope and gates
 
@@ -76,10 +97,8 @@ more code depends on it.
    backup/restore integrity check are implemented and tested.
 7. A written raw-artifact retention state (`reproducible`, `derived-only`, or `minimal/audit-only`)
    is recorded per investigation; reports disclose when source bytes no longer exist.
-8. `ruff check` clean — 18 findings outstanding.
-9. `mypy src` clean — 11 findings outstanding, including one genuine annotation weakness
-   (`orchestrator.py:308` types an agent class as bare `type`; the rest are variable-shadowing
-   inference complaints in `reporting.py`).
+8. `ruff check` clean.
+9. `mypy src` clean.
 10. Alembic introduced with a baseline revision, replacing `create_all()`.
 11. CI in GitHub Actions: ruff, ruff format, mypy, pytest, `pip-audit` — all gating.
 12. Pre-commit hooks including a secret scan.
@@ -87,6 +106,32 @@ more code depends on it.
 14. The status table in [README.md](../README.md) updated to reflect what tests now prove.
 15. The localhost/single-user operating boundary is tested as configuration and documented in the
     capability output.
+
+### 3.1 Where each criterion actually stands
+
+Audited 2026-08-28. **Met** means a command was run or a test was read, not that the code looks
+present.
+
+| # | Criterion | State | Evidence, or what is missing |
+|---|---|---|---|
+| 1 | pytest across the four layers | met | 111 passed; `unit/ integration/ api/ security/` plus `scenarios/` |
+| 2 | Vertical slice executes | met | `tests/scenarios/test_auth_log_scenario.py`, plus a clean-log baseline |
+| 3 | G0–G4 each raise `GroundingError` | met | `integration/test_grounding.py`; G0's case is `test_grounding_invariant_cross_investigation_isolated` — renaming it would make the mapping legible without inference |
+| 4 | Append-only tested for `evidence`, `audit_log` | met | row-level and bulk-DML cases for both, plus the sanctioned purge |
+| 5 | Recovery terminal, explicit retry, **DB-backed start claim** | **partial** | recovery and retry are tested; `start_investigation` still reads status then writes it, so two concurrent starts can both observe `CREATED`. Needs a rowcount-checked conditional `UPDATE` and a concurrency test |
+| 6 | Quotas, truncation markers, pagination, **backup/restore check** | **partial** | quota and truncation markers implemented but no test names either; cursor pagination implemented and tested; backup/restore integrity check does not exist |
+| 7 | Retention state recorded, **reports disclose lost bytes** | **partial** | `retention_state` on `Investigation` and `Artifact`, PATCH-able, and the provenance endpoint discloses a chain ending at derived records; `reporting.py` §9 never mentions retention |
+| 8 | `ruff check` clean | met | `All checks passed!` |
+| 9 | `mypy src` clean | met | 54 source files, no issues |
+| 10 | Alembic **replacing** `create_all()` | **partial** | three revisions apply from empty and `alembic check` reports no drift, but `bootstrap()`, `cli.py init` and every test fixture still build the schema with `create_all()`, so the migrations carry no test coverage |
+| 11 | CI gating, including `pip-audit` | met | `pip-audit` and a `uv.lock` consistency check now gate; CI also runs on all branches |
+| 12 | Pre-commit incl. secret scan | met | `.pre-commit-config.yaml` with `detect-secrets` |
+| 13 | Stale phase refs corrected | met | corrected against this document |
+| 14 | README status table current | met | measured figures, and the phase vocabulary matches this table |
+| 15 | Localhost/single-user boundary in capability output | **not met** | `/capabilities` returns environment, tools, agents, planner, `not_implemented`; the operating boundary appears in none of them and no test asserts it |
+
+Four criteria remain: **5, 6, 7 and 15.** They are Phase 1′ debt, they are not Phase 4 blockers, and
+they are listed here so that "1′ complete" cannot be read off a table without meeting them.
 
 **Estimate: 2–3 weeks with the full team.** Anything that ships before this completes inherits an
 unverified foundation, and the first place that surfaces is the evaluation, where a silent bug becomes
@@ -101,8 +146,14 @@ The largest phase, and the one that changes the threat model.
 - **Sandboxing first.** T1 subprocess isolation, then T2 containers (read-only rootfs,
   `--network=none`, non-root, dropped capabilities, resource limits). No parser handling binary or
   untrusted input ships before its tier exists.
-- **Security controls that are currently absent**: rate limiting, SSRF defence (written *with* the
-  first URL tool, alongside its table-driven test), per-tool timeouts, third-party key handling.
+- **Security controls, some of which now exist as unwired scaffolding.** Landed early and out of
+  order: a sliding-window rate limiter (wired to login only — `investigation_limiter` is defined and
+  unused), `core/security/net.py::validate_url_safe`, `tools/sandbox.py::run_subprocess_sandboxed`
+  (T1), and `core/detection/mitre.py` (G7, with no catalog to load). Each has unit tests and no
+  caller in `src/`, which inflates the suite's apparent coverage; `core/limitations.py` declares them
+  inactive so no report or `/capabilities` response claims them. Still genuinely absent: per-tool
+  timeouts and third-party key handling. SSRF defence is to be *wired* with the first URL tool,
+  alongside its table-driven test, as originally intended.
 - Network tools: TShark, Zeek, Suricata. Endpoint: EVTX, process/persistence analysis, YARA, Sigma.
 - Threat intelligence (T3): VirusTotal, AbuseIPDB, OTX, Shodan — per-investigation opt-in, every
   lookup recorded, outbound rate limits.
