@@ -55,6 +55,7 @@ core/llm/
 ```python
 class LLMProvider(Protocol):
     name: str
+
     async def complete(self, request: LLMRequest) -> LLMResponse: ...
     async def probe(self) -> ProviderAvailability: ...
 ```
@@ -85,14 +86,14 @@ Agents request a **task class**, never a model:
 
 ```python
 class TaskClass(StrEnum):
-    PLANNING          # which agents to run, and why
-    EXTRACTION        # structured pull from text
-    CLASSIFICATION    # bounded label assignment
-    CORRELATION       # entity/event linking proposals
-    HYPOTHESIS        # competing explanations
-    VALIDATION        # adversarial review of a conclusion
-    NARRATIVE         # report prose from stored records
-    CHAT              # investigator Q&A
+    PLANNING  # which agents to run, and why
+    EXTRACTION  # structured pull from text
+    CLASSIFICATION  # bounded label assignment
+    CORRELATION  # entity/event linking proposals
+    HYPOTHESIS  # competing explanations
+    VALIDATION  # adversarial review of a conclusion
+    NARRATIVE  # report prose from stored records
+    CHAT  # investigator Q&A
 ```
 
 The routing table lives in configuration, not code:

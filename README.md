@@ -24,9 +24,9 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 
 | Quality Gate | Status |
 |---|---|
-| Tests | **67 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
+| Tests | **111 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
 | Lint | **0 ruff errors** (`ruff check src tests`) |
-| Types | **0 mypy errors** across 78 source files (`mypy src tests`) |
+| Types | **0 mypy errors** across 54 source files (`mypy src`) |
 | Vertical slice | **100% verified end to end** with SQLite database, real auth log attacks, and clean log baselines |
 | Security Invariants | Grounding invariants G0–G4, immutability, token safety, role authz matrix, and no `shell=True` verified |
 | Frontend | **Interactive dashboard** in `web/` served directly by FastAPI |

@@ -94,8 +94,9 @@ boundary later changes.
 | `POST` | `/investigations/{id}/cancel` | investigator | Cancel in-flight run and transition to `halted` status |
 | `POST` | `/investigations/{id}/retry` | investigator | Re-queue failed, halted, or partial investigation |
 | `GET` | `/investigations/{id}/evidence` | viewer | Paged evidence query, filterable by `kind` |
+| `GET` | `/investigations/{id}/evidence/{evidence_id}/provenance` | viewer | Resolve full provenance chain (tool run, artifact, agent run, gaps) |
 | `GET` | `/investigations/{id}/report` | viewer | Generated report (audited on read) |
-| `DELETE` | `/investigations/{id}` | investigator | Delete investigation with cascade and audit record |
+| `DELETE` | `/investigations/{id}` | investigator | Delete investigation; requires `?purge=true` if append-only records exist |
 
 `start` returns `202`-style semantics with a `StartResponse` rather than blocking: it commits the
 status transition **before** scheduling, so the background task cannot race the request transaction for

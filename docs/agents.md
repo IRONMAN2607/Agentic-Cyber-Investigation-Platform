@@ -20,10 +20,11 @@ class AgentContext:
     investigation: Investigation
     artifacts: list[Artifact]
     session: AsyncSession
-    store: EvidenceStore        # the only way to assert
-    tools: ToolRunner           # the only way to produce evidence
+    store: EvidenceStore  # the only way to assert
+    tools: ToolRunner  # the only way to produce evidence
     settings: Settings
     agent_run_id: uuid.UUID
+
 
 class AgentResult(BaseModel):
     status: RunStatus = SUCCEEDED
@@ -31,8 +32,9 @@ class AgentResult(BaseModel):
     evidence_ids: list[str] = []
     finding_ids: list[str] = []
     metrics: dict[str, Any] = {}
-    next_actions: list[str] = []   # advisory; the orchestrator decides
+    next_actions: list[str] = []  # advisory; the orchestrator decides
     errors: list[str] = []
+
 
 class Agent(ABC):
     name: ClassVar[str]
@@ -111,11 +113,13 @@ nothing.
 class Task:
     task_id: str
     agent_name: str
-    rationale: str          # the recorded reason this task exists
+    rationale: str  # the recorded reason this task exists
     inputs: dict[str, Any]
+
 
 class Planner(Protocol):
     name: str
+
     def plan(self, investigation, artifacts) -> Plan: ...
 ```
 

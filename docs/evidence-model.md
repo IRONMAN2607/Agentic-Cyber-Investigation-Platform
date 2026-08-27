@@ -33,26 +33,29 @@ An evidence row is an immutable observation with provenance.
 
 ```python
 Evidence(
-    kind=EvidenceKind.AUTH_EVENT,     # what class of observation
-    source_tool="auth_log_parser",     # which adapter produced it
-    observed_at=...,                   # when the event happened  (nullable)
-    time_confidence=EXACT,             # how much to trust observed_at
-    collected_at=...,                  # when the platform recorded it
-    data={...},                        # normalized, tool-specific payload
-    entities={"refs": [...]},          # typed EntityRefs for the graph
-    confidence=1.0,                    # tool's confidence in the observation
-    content_hash="…",                  # dedupe key
-    artifact_id=..., tool_run_id=..., agent_run_id=...,   # provenance
+    kind=EvidenceKind.AUTH_EVENT,  # what class of observation
+    source_tool="auth_log_parser",  # which adapter produced it
+    observed_at=...,  # when the event happened  (nullable)
+    time_confidence=EXACT,  # how much to trust observed_at
+    collected_at=...,  # when the platform recorded it
+    data={...},  # normalized, tool-specific payload
+    entities={"refs": [...]},  # typed EntityRefs for the graph
+    confidence=1.0,  # tool's confidence in the observation
+    content_hash="…",  # dedupe key
+    artifact_id=...,
+    tool_run_id=...,
+    agent_run_id=...,  # provenance
 )
 ```
 
 ### Immutability
 
-`Evidence` and `AuditLog` reject `UPDATE` and `DELETE` through SQLAlchemy mapper events
-(`before_update`, `before_delete` → `RuntimeError`). A correction is a new row, never an edit. The
-history of what the platform believed and when is itself evidence. Phase 5 adds database-level
-enforcement by revoking the grants in PostgreSQL, so the guarantee survives code that bypasses the
-ORM.
+`Evidence`, `AuditLog`, and `ModelExecution` are append-only. They are protected against mutation or deletion at three levels:
+1. **Mapper events:** reject instance-level `UPDATE`/`DELETE` (`before_update`, `before_delete` → `RuntimeError`).
+2. **Session-level bulk DML guard:** rejects bulk `UPDATE`/`DELETE` queries targeting append-only tables across all SQLAlchemy sessions.
+3. **Foreign key `RESTRICT`:** foreign keys referencing parent entities (`investigations`, `artifacts`, `tool_runs`, `agent_runs`) are `RESTRICT`, ensuring that parent record deletion cannot silently delete evidence or erase `tool_run_id` (the deterministic-origin marker for G1) beneath the ORM.
+
+Deliberate destruction (e.g. audited compliance purges) requires the explicit `authorized_purge()` context manager and is recorded to the audit log prior to execution. Phase 5 adds database-level enforcement by revoking the grants in PostgreSQL.
 
 ### Two timestamps
 
@@ -93,13 +96,15 @@ A finding is a claim about the investigation, bound to its supporting evidence.
 
 ```python
 Finding(
-    title=..., description=...,
-    assertion_class=...,          # FACT | INFERENCE | HYPOTHESIS | UNKNOWN
-    severity=..., confidence=...,
-    evidence_ids=[...],           # citations
-    reasoning=...,                # required for INFERENCE and HYPOTHESIS
-    detection_rule=...,           # deterministic rule id, when applicable
-    agent_run_id=...,             # who asserted it
+    title=...,
+    description=...,
+    assertion_class=...,  # FACT | INFERENCE | HYPOTHESIS | UNKNOWN
+    severity=...,
+    confidence=...,
+    evidence_ids=[...],  # citations
+    reasoning=...,  # required for INFERENCE and HYPOTHESIS
+    detection_rule=...,  # deterministic rule id, when applicable
+    agent_run_id=...,  # who asserted it
 )
 ```
 
@@ -171,4 +176,7 @@ Finding  ──cites──▶  Evidence  ──tool_run_id──▶  ToolRun  �
 ```
 
 This chain is what makes the platform defensible academically: for any statement in the output, the
-tool, arguments, agent, timestamp, and input file that produced it can be named.
+tool, arguments, agent, timestamp, and input file that produced it can be named. The API provides
+first-class provenance resolution via `GET /investigations/{id}/evidence/{evidence_id}/provenance`,
+which resolves the complete chain in a single round trip and explicitly identifies any provenance gaps
+(e.g., missing tool run, deleted source bytes).

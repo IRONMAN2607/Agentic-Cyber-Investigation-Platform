@@ -10,7 +10,7 @@ Referenced from `acip/types.py` (`SandboxTier`) and `acip/tools/base.py`.
 ```python
 class ToolAdapter(ABC):
     name: ClassVar[str]
-    version: ClassVar[str]              # bumped when output changes; recorded on every run
+    version: ClassVar[str]  # bumped when output changes; recorded on every run
     tier: ClassVar[SandboxTier]
     args_model: ClassVar[type[BaseModel]] = NoArgs
     requires_artifact: ClassVar[bool] = False

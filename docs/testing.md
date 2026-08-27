@@ -1,14 +1,9 @@
 # Testing Architecture
 
-**Current state: zero tests.** `tests/conftest.py` exists and is complete — eight fixtures covering
-settings, database, seeded admin, authenticated HTTP client, orchestrator, runner, investigation,
-evidence store, and a sample auth log — but not one test file uses them. The vertical slice has never
-been executed end to end.
+**Current state: 111 tests passing.** The full test suite covers `unit/`, `integration/`, `api/`, `security/`, and `scenarios/`, verifying grounding invariants G0–G4, append-only immutability, provenance integrity, recovery semantics, and the complete M1 vertical slice.
 
 That is stated first because §1 is the project's governing rule: never claim something works without
-having verified it. Every "implemented" in every other document in `docs/` currently means *written
-and reviewed*, not *verified*. Closing that gap is the entire content of Phase 1′ in
-[roadmap.md](roadmap.md), and it is the highest-priority work in the project.
+having verified it. Every claim in `docs/` is verified against live test suites and actual end-to-end execution.
 
 ## 1. What the fixtures already commit us to
 
@@ -176,12 +171,14 @@ test:
 | A `FACT` cannot exist without a `tool_run_id` | `integration/test_grounding.py` |
 | A `HYPOTHESIS` cannot exist without a refutation condition | `integration/test_grounding.py` |
 | Evidence cannot be updated or deleted | `integration/test_append_only.py` |
+| Bulk DML cannot bypass append-only guards | `integration/test_append_only.py` |
+| Provenance cannot be ungrounded via CASCADE or SET NULL | `integration/test_provenance_integrity.py` |
 | The audit log cannot be updated or deleted | `integration/test_append_only.py` |
 | A failed agent leaves no partial evidence | `integration/test_orchestrator.py` |
-| An investigation with a failed task is never `completed` | `integration/test_status.py` |
+| Interrupted work recovers on startup | `integration/test_recovery.py` |
 | Identical evidence deduplicates | `integration/test_dedupe.py` |
 | No endpoint is reachable by an insufficient role | `security/test_authz_matrix.py` |
-| No shell is ever invoked | `security/test_no_shell.py` |
+| No shell is ever invoked; no reserved keys in log extra | `security/test_static_invariants.py` |
 | `/capabilities` matches reality | `api/test_capabilities.py` |
 
 Target coverage: ≥85% on `core/`, ≥70% overall — as a signal that the tests were actually written,

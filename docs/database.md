@@ -53,11 +53,11 @@ tool_runs                                        ← audit of every tool invocat
   started_at · finished_at · duration_ms · error
 
 evidence                                         ← append-only, content-hash deduplicated
-  id PK · investigation_id FK CASCADE IX
+  id PK · investigation_id FK RESTRICT IX
   kind · source_tool
   observed_at · time_confidence · collected_at
   data JSON · entities JSON · confidence · content_hash IX
-  artifact_id FK SET NULL · tool_run_id FK SET NULL · agent_run_id FK SET NULL
+  artifact_id FK RESTRICT · tool_run_id FK RESTRICT · agent_run_id FK RESTRICT
   UNIQUE (investigation_id, content_hash)
   INDEX (investigation_id, kind) · (investigation_id, observed_at)
 
@@ -90,7 +90,7 @@ hypothesis_gaps                                  ← declared evidence gaps
   description · required_tool · resolved · created_at
 
 llm_calls                                        ← model executions trace (append-only)
-  id PK · investigation_id FK CASCADE · agent_run_id FK SET NULL
+  id PK · investigation_id FK RESTRICT IX · agent_run_id FK RESTRICT
   task_id · task_class · provider · model · prompt_name · prompt_version
   tokens_in · tokens_out · latency_ms · cost_estimate_usd
   finish_reason · retries · schema_valid · fallback_from
@@ -107,10 +107,12 @@ audit_log                                        ← append-only security audit 
 
 ### Append-only enforcement
 
-`evidence` and `audit_log` reject `UPDATE`/`DELETE` via SQLAlchemy mapper events. Enforcing it at the
-mapper means a mistake anywhere in the codebase fails loudly rather than silently rewriting history.
-Phase 5 adds database-level enforcement by revoking the grants in PostgreSQL, so the guarantee holds
-even against code that bypasses the ORM.
+`evidence`, `audit_log`, and `llm_calls` reject `UPDATE`/`DELETE` via two complementary layers:
+1. **Mapper events:** reject instance-level mutation (`before_update`, `before_delete` → `RuntimeError`).
+2. **Session-level bulk DML guard (`do_orm_execute` event):** blocks `session.execute(update(...))` and `session.execute(delete(...))` across all append-only tables, preventing ungrounded bulk rewrites.
+3. **Foreign key `RESTRICT`:** foreign keys pointing to `evidence` and `llm_calls` are `RESTRICT`, preventing parent deletion (`CASCADE`) or ungrounding (`SET NULL` on `tool_run_id`) beneath the ORM.
+
+Deliberate destruction (such as GDPR/compliance investigation purges) requires the explicit `authorized_purge()` context manager and is audited before execution. Phase 5 adds database-level enforcement by revoking the grants in PostgreSQL.
 
 ### Index rationale
 
@@ -205,6 +207,7 @@ cacheable and expiring — not evidence about the indicator itself.
 **Current state: Alembic migrations active.**
 - `0001_initial_schema`: Initial 9 core tables (`users`, `investigations`, `artifacts`, `agent_runs`, `tool_runs`, `evidence`, `findings`, `reports`, `audit_log`).
 - `0002_core_domain_models`: Added domain models (`task_runs`, `finding_evidence`, `hypotheses`, `hypothesis_evidence`, `hypothesis_gaps`, `llm_calls`).
+- `0003_evidence_provenance_restrict`: Upgraded foreign keys on append-only tables (`evidence`, `llm_calls`) to `RESTRICT` across `investigation_id`, `artifact_id`, `tool_run_id`, and `agent_run_id` to prevent silent deletion or ungrounding beneath the ORM.
 
 Migrations are managed through Alembic and validated against head on startup (`alembic upgrade head`). Fresh installs and upgrades from released revisions are verified. Irreversible revisions document backup recovery procedures. The test suite automatically runs against the migrated SQLite schema.
 
