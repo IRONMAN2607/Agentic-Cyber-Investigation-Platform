@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     max_investigation_seconds: int = Field(default=300, ge=5)
     max_tasks_per_investigation: int = Field(default=25, ge=1)
 
+    # database.md s1: "an upload limit alone does not bound storage or query
+    # cost". max_artifact_bytes caps one upload; this caps what parsing it may
+    # write, and therefore what any later read has to traverse.
+    max_evidence_per_investigation: int = Field(default=50_000, ge=100)
+
     # --- Detection thresholds (deterministic, so they must be tunable) ------
     bruteforce_min_failures: int = Field(default=5, ge=2)
     bruteforce_window_seconds: int = Field(default=300, ge=1)

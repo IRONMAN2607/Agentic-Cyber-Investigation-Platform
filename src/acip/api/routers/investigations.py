@@ -30,6 +30,7 @@ from acip.api.schemas import (
     InvestigationResponse,
     InvestigationUpdate,
     PagedEvidence,
+    ProvenanceChainResponse,
     ReportResponse,
     StartResponse,
     TaskCreate,
@@ -37,6 +38,7 @@ from acip.api.schemas import (
     ToolRunResponse,
 )
 from acip.core import audit
+from acip.core.evidence.store import MAX_EVIDENCE_PAGE, EvidenceStore
 from acip.core.security.files import store_stream
 from acip.db.models import (
     AgentRun,
@@ -44,13 +46,21 @@ from acip.db.models import (
     Evidence,
     Finding,
     Investigation,
+    ModelExecution,
     Report,
     TaskRun,
     ToolRun,
 )
+from acip.db.session import authorized_purge
 from acip.errors import ConflictError, NotFoundError
 from acip.logging import get_logger
-from acip.types import ArtifactKind, InvestigationStatus, TargetType, TaskStatus
+from acip.types import (
+    ArtifactKind,
+    InvestigationStatus,
+    RetentionState,
+    TargetType,
+    TaskStatus,
+)
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/investigations", tags=["investigations"])
@@ -454,29 +464,77 @@ async def retry_investigation(
 async def list_evidence(
     investigation: LoadedInvestigation,
     session: Annotated[AsyncSession, Depends(get_session)],
-    limit: Annotated[int, Query(ge=1, le=500)] = 100,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=MAX_EVIDENCE_PAGE)] = 100,
+    cursor: Annotated[
+        str | None, Query(description="Opaque cursor from a previous page's next_cursor.")
+    ] = None,
     kind: Annotated[str | None, Query()] = None,
 ) -> PagedEvidence:
-    conditions = [Evidence.investigation_id == investigation.id]
-    if kind:
-        conditions.append(Evidence.kind == kind)
+    """One page of evidence in timeline order.
 
-    total = await session.scalar(
-        sa.select(sa.func.count()).select_from(Evidence).where(*conditions)
-    )
-    rows = await session.scalars(
-        sa.select(Evidence)
-        .where(*conditions)
-        .order_by(Evidence.observed_at.is_(None), Evidence.observed_at, Evidence.collected_at)
-        .limit(limit)
-        .offset(offset)
-    )
+    Ordering and cursor handling live in :class:`~acip.core.evidence.store.EvidenceStore`
+    rather than here. Two places ordering the same rows is how the sort key and the
+    pagination key drift apart, which is the defect this replaced.
+    """
+    store = EvidenceStore(session, investigation.id)
+    kinds = [kind] if kind else None
+    page = await store.list_evidence(limit=limit, cursor=cursor, kinds=kinds)
     return PagedEvidence(
-        items=[EvidenceResponse.model_validate(row) for row in rows.all()],
-        total=int(total or 0),
+        items=[EvidenceResponse.model_validate(row) for row in page.rows],
+        total=await store.count_evidence(kinds=kinds),
         limit=limit,
-        offset=offset,
+        next_cursor=page.next_cursor,
+    )
+
+
+@router.get(
+    "/{investigation_id}/evidence/{evidence_id}/provenance",
+    response_model=ProvenanceChainResponse,
+)
+async def get_evidence_provenance(
+    investigation: LoadedInvestigation,
+    evidence_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ProvenanceChainResponse:
+    """Resolve one observation to the tool, arguments, agent and artifact behind it."""
+    row = await session.scalar(
+        sa.select(Evidence).where(
+            Evidence.id == evidence_id,
+            Evidence.investigation_id == investigation.id,
+        )
+    )
+    if row is None:
+        # Scoped to the investigation, so this also refuses to confirm that an id
+        # belonging to another investigation exists at all (G0's read-side twin).
+        raise NotFoundError(
+            f"evidence {evidence_id} not found in this investigation",
+            detail={"investigation_id": str(investigation.id)},
+        )
+
+    tool_run = await session.get(ToolRun, row.tool_run_id) if row.tool_run_id else None
+    artifact = await session.get(Artifact, row.artifact_id) if row.artifact_id else None
+    agent_run = await session.get(AgentRun, row.agent_run_id) if row.agent_run_id else None
+
+    gaps: list[str] = []
+    if tool_run is None:
+        gaps.append("no tool run recorded: this observation has no deterministic origin (G1)")
+    if artifact is None:
+        gaps.append("no source artifact recorded: the observation cannot be traced to input bytes")
+    elif artifact.retention_state != RetentionState.REPRODUCIBLE.value:
+        gaps.append(
+            "source bytes are no longer retained "
+            f"(retention_state={artifact.retention_state}); the chain ends at derived records"
+        )
+    if agent_run is None:
+        gaps.append("no agent run recorded: the requesting agent cannot be named")
+
+    return ProvenanceChainResponse(
+        evidence=EvidenceResponse.model_validate(row),
+        tool_run=ToolRunResponse.model_validate(tool_run) if tool_run else None,
+        artifact=ArtifactResponse.model_validate(artifact) if artifact else None,
+        agent_run=AgentRunResponse.model_validate(agent_run) if agent_run else None,
+        complete=not gaps,
+        gaps=gaps,
     )
 
 
@@ -508,23 +566,81 @@ async def get_report(
     return ReportResponse.model_validate(report)
 
 
+async def _append_only_counts(session: AsyncSession, investigation_id: uuid.UUID) -> dict[str, int]:
+    """Count the records a purge would destroy, before any of them are gone."""
+    counts: dict[str, int] = {}
+    for label, model in (
+        ("evidence", Evidence),
+        ("findings", Finding),
+        ("tool_runs", ToolRun),
+        ("model_executions", ModelExecution),
+    ):
+        total = await session.scalar(
+            sa.select(sa.func.count())
+            .select_from(model)
+            .where(model.investigation_id == investigation_id)
+        )
+        counts[label] = int(total or 0)
+    return counts
+
+
 @router.delete("/{investigation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_investigation(
     investigation: LoadedInvestigation,
     user: Investigator,
     session: Annotated[AsyncSession, Depends(get_session)],
+    purge: Annotated[
+        bool, Query(description="Required to destroy an investigation holding append-only records.")
+    ] = False,
 ) -> None:
-    """Delete an investigation and cascade its operational records."""
-    inv_id_str = str(investigation.id)
-    await session.delete(investigation)
-    await session.flush()
+    """Delete an investigation; destroying append-only records requires an explicit purge.
+
+    Evidence and model-execution rows are append-only, and their foreign keys are
+    ``RESTRICT`` precisely so that deleting a parent cannot quietly take them
+    with it. Destroying them is therefore a deliberate act, not a side effect:
+    ``?purge=true`` is required, and the counts are captured *before* anything is
+    removed so the audit row can name what was destroyed, as database.md s5
+    requires. The audit row survives the purge because ``audit_log`` holds no
+    foreign key to the investigation.
+
+    An investigation holding no append-only records deletes without the flag —
+    there is nothing to protect, and the 409 exists to prevent silent loss.
+    """
+    inv_id = investigation.id
+    inv_id_str = str(inv_id)
+    counts = await _append_only_counts(session, inv_id)
+    destroyed = {label: count for label, count in counts.items() if count}
+
+    if destroyed and not purge:
+        raise ConflictError(
+            "investigation holds append-only records; destroying them must be an explicit purge",
+            detail={"records": destroyed, "retry_with": "?purge=true"},
+        )
 
     await audit.record(
         session,
         actor=user.username,
-        action="investigation.deleted",
+        action="investigation.purged" if destroyed else "investigation.deleted",
         resource_type="investigation",
         resource_id=inv_id_str,
+        detail={"destroyed": destroyed} if destroyed else {},
+    )
+
+    with authorized_purge():
+        # RESTRICT means nothing reaches evidence by cascade any more, so the
+        # append-only rows are removed explicitly and first; deleting the
+        # investigation then cascades the operational records that may be
+        # discarded freely.
+        await session.execute(sa.delete(Evidence).where(Evidence.investigation_id == inv_id))
+        await session.execute(
+            sa.delete(ModelExecution).where(ModelExecution.investigation_id == inv_id)
+        )
+        await session.delete(investigation)
+        await session.flush()
+
+    logger.info(
+        "investigation purged" if destroyed else "investigation deleted",
+        extra={"investigation_id": inv_id_str, "actor": user.username, "destroyed": destroyed},
     )
 
 

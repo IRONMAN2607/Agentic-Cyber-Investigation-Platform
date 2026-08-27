@@ -1,21 +1,21 @@
 """Initial schema
 
 Revision ID: 0001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-08-26 00:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "0001_initial_schema"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -71,7 +71,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["uploaded_by"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_artifacts_investigation_id", "artifacts", ["investigation_id"], unique=False)
+    op.create_index(
+        "ix_artifacts_investigation_id", "artifacts", ["investigation_id"], unique=False
+    )
     op.create_index("ix_artifacts_sha256", "artifacts", ["sha256"], unique=False)
 
     op.create_table(
@@ -92,7 +94,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_agent_runs_investigation_id", "agent_runs", ["investigation_id"], unique=False)
+    op.create_index(
+        "ix_agent_runs_investigation_id", "agent_runs", ["investigation_id"], unique=False
+    )
     op.create_index("ix_agent_runs_agent_name", "agent_runs", ["agent_name"], unique=False)
 
     op.create_table(
@@ -116,7 +120,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_tool_runs_investigation_id", "tool_runs", ["investigation_id"], unique=False)
+    op.create_index(
+        "ix_tool_runs_investigation_id", "tool_runs", ["investigation_id"], unique=False
+    )
     op.create_index("ix_tool_runs_tool_name", "tool_runs", ["tool_name"], unique=False)
 
     op.create_table(
@@ -145,7 +151,9 @@ def upgrade() -> None:
     op.create_index("ix_evidence_investigation_id", "evidence", ["investigation_id"], unique=False)
     op.create_index("ix_evidence_content_hash", "evidence", ["content_hash"], unique=False)
     op.create_index("ix_evidence_inv_kind", "evidence", ["investigation_id", "kind"], unique=False)
-    op.create_index("ix_evidence_inv_observed", "evidence", ["investigation_id", "observed_at"], unique=False)
+    op.create_index(
+        "ix_evidence_inv_observed", "evidence", ["investigation_id", "observed_at"], unique=False
+    )
 
     op.create_table(
         "findings",

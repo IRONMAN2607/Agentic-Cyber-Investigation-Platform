@@ -5,17 +5,17 @@ Revises: 0001_initial_schema
 Create Date: 2026-08-26 01:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "0002_core_domain_models"
-down_revision: Union[str, None] = "0001_initial_schema"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0001_initial_schema"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -37,7 +37,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_task_runs_investigation_id", "task_runs", ["investigation_id"], unique=False)
+    op.create_index(
+        "ix_task_runs_investigation_id", "task_runs", ["investigation_id"], unique=False
+    )
     op.create_index("ix_task_runs_task_id", "task_runs", ["task_id"], unique=False)
     op.create_index("ix_task_runs_task_type", "task_runs", ["task_type"], unique=False)
 
@@ -58,8 +60,12 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("finding_id", "evidence_id", "role", name="uq_finding_evidence"),
     )
-    op.create_index("ix_finding_evidence_finding_id", "finding_evidence", ["finding_id"], unique=False)
-    op.create_index("ix_finding_evidence_evidence_id", "finding_evidence", ["evidence_id"], unique=False)
+    op.create_index(
+        "ix_finding_evidence_finding_id", "finding_evidence", ["finding_id"], unique=False
+    )
+    op.create_index(
+        "ix_finding_evidence_evidence_id", "finding_evidence", ["evidence_id"], unique=False
+    )
 
     # 3. hypotheses table
     op.create_table(
@@ -76,7 +82,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_hypotheses_investigation_id", "hypotheses", ["investigation_id"], unique=False)
+    op.create_index(
+        "ix_hypotheses_investigation_id", "hypotheses", ["investigation_id"], unique=False
+    )
     op.create_index("ix_hypotheses_status", "hypotheses", ["status"], unique=False)
 
     # 4. hypothesis_evidence table
@@ -92,8 +100,15 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("hypothesis_id", "evidence_id", "role", name="uq_hypothesis_evidence"),
     )
-    op.create_index("ix_hypothesis_evidence_hypothesis_id", "hypothesis_evidence", ["hypothesis_id"], unique=False)
-    op.create_index("ix_hypothesis_evidence_evidence_id", "hypothesis_evidence", ["evidence_id"], unique=False)
+    op.create_index(
+        "ix_hypothesis_evidence_hypothesis_id",
+        "hypothesis_evidence",
+        ["hypothesis_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_hypothesis_evidence_evidence_id", "hypothesis_evidence", ["evidence_id"], unique=False
+    )
 
     # 5. hypothesis_gaps table
     op.create_table(
@@ -107,7 +122,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["hypothesis_id"], ["hypotheses.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_hypothesis_gaps_hypothesis_id", "hypothesis_gaps", ["hypothesis_id"], unique=False)
+    op.create_index(
+        "ix_hypothesis_gaps_hypothesis_id", "hypothesis_gaps", ["hypothesis_id"], unique=False
+    )
 
     # 6. llm_calls table (model execution audit)
     op.create_table(
@@ -138,7 +155,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_llm_calls_investigation_id", "llm_calls", ["investigation_id"], unique=False)
+    op.create_index(
+        "ix_llm_calls_investigation_id", "llm_calls", ["investigation_id"], unique=False
+    )
     op.create_index("ix_llm_calls_created_at", "llm_calls", ["created_at"], unique=False)
 
 

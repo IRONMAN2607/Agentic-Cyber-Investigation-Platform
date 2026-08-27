@@ -100,9 +100,22 @@ async def test_investigation_full_lifecycle_api(
     assert report_resp.status_code == 200
     assert len(report_resp.json()["content"]) > 0
 
-    # 9. Delete investigation
+    # 9. An investigation holding append-only records refuses a plain delete,
+    #    and the refusal names what would have been destroyed.
+    refused = await client.delete(
+        f"/api/v1/investigations/{inv_id}",
+        headers=investigator_auth,
+    )
+    assert refused.status_code == 409
+    refusal = refused.json()
+    assert refusal["code"] == "conflict"
+    assert refusal["detail"]["records"]["evidence"] > 0
+    assert refusal["detail"]["retry_with"] == "?purge=true"
+
+    # 10. The explicit purge succeeds.
     del_resp = await client.delete(
         f"/api/v1/investigations/{inv_id}",
+        params={"purge": "true"},
         headers=investigator_auth,
     )
     assert del_resp.status_code == 204

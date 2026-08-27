@@ -215,6 +215,16 @@ class Evidence(Base):
 
     ``tool_run_id`` being non-NULL is the marker of deterministic origin; the
     grounding invariants in :mod:`acip.core.evidence.store` depend on it.
+
+    Every provenance foreign key is ``RESTRICT``, not ``CASCADE`` or
+    ``SET NULL``. Both of the softer options destroy an immutable row's
+    provenance as a side effect of deleting something else, below the ORM where
+    the append-only guards cannot see it: ``CASCADE`` on the investigation
+    silently deletes the evidence, and ``SET NULL`` on ``tool_run_id`` erases
+    the G1 deterministic-origin marker, retroactively ungrounding every FACT
+    that cited it. database.md s1 is explicit that parent deletion is not an
+    integrity policy — evidence destruction goes through the audited purge in
+    the investigations router, which records what it removed.
     """
 
     __tablename__ = "evidence"
@@ -226,7 +236,7 @@ class Evidence(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(
-        sa.ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+        sa.ForeignKey("investigations.id", ondelete="RESTRICT"), index=True
     )
     kind: Mapped[str] = mapped_column(sa.String(64))
     source_tool: Mapped[str] = mapped_column(sa.String(64))
@@ -241,13 +251,13 @@ class Evidence(Base):
     content_hash: Mapped[str] = mapped_column(sa.String(64), index=True)
 
     artifact_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.ForeignKey("artifacts.id", ondelete="SET NULL"), default=None
+        sa.ForeignKey("artifacts.id", ondelete="RESTRICT"), default=None
     )
     tool_run_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.ForeignKey("tool_runs.id", ondelete="SET NULL"), default=None
+        sa.ForeignKey("tool_runs.id", ondelete="RESTRICT"), default=None
     )
     agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.ForeignKey("agent_runs.id", ondelete="SET NULL"), default=None
+        sa.ForeignKey("agent_runs.id", ondelete="RESTRICT"), default=None
     )
 
     @property
@@ -389,16 +399,22 @@ class HypothesisGap(Base):
 
 
 class ModelExecution(Base):
-    """Audited execution trace of any LLM invocation (append-only research dataset)."""
+    """Audited execution trace of any LLM invocation (append-only research dataset).
+
+    Provenance foreign keys are ``RESTRICT`` for the same reason as
+    :class:`Evidence`: this table is append-only, so it must not be destroyed or
+    have its provenance erased as a side effect of deleting a parent row. Empty
+    until Phase 6 introduces the first model call.
+    """
 
     __tablename__ = "llm_calls"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(
-        sa.ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+        sa.ForeignKey("investigations.id", ondelete="RESTRICT"), index=True
     )
     agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.ForeignKey("agent_runs.id", ondelete="SET NULL"), default=None
+        sa.ForeignKey("agent_runs.id", ondelete="RESTRICT"), default=None
     )
     task_id: Mapped[str | None] = mapped_column(sa.String(64), default=None)
     task_class: Mapped[str] = mapped_column(sa.String(64))

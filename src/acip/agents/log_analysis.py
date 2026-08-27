@@ -81,7 +81,7 @@ class LogAnalysisAgent(Agent):
         if matched_total == 0:
             return await self._nothing_recognised(ctx, parse_metrics, warnings)
 
-        events, undated = await self._load_events(ctx)
+        events, undated, truncated = await self._load_events(ctx)
         hits = evaluate_auth_rules(
             events,
             min_failures=ctx.settings.bruteforce_min_failures,
@@ -93,6 +93,8 @@ class LogAnalysisAgent(Agent):
             finding_ids.append(await self._record_hit(ctx, hit))
         if undated:
             finding_ids.append(await self._record_undated_gap(ctx, undated))
+        if truncated:
+            finding_ids.append(await self._record_truncation_gap(ctx, len(events)))
 
         return AgentResult(
             status=RunStatus.SUCCEEDED,
@@ -106,6 +108,7 @@ class LogAnalysisAgent(Agent):
                 "artifacts_parsed": len(candidates),
                 "events_parsed": matched_total,
                 "events_undated": undated,
+                "events_truncated": truncated,
                 "rules_fired": [hit.rule_id for hit in hits],
                 "per_artifact": parse_metrics,
                 "warnings": warnings,
@@ -116,14 +119,20 @@ class LogAnalysisAgent(Agent):
 
     # --- Evidence loading ---------------------------------------------------
 
-    async def _load_events(self, ctx: AgentContext) -> tuple[list[AuthEventView], int]:
-        """Project stored evidence into the rule engine's view type."""
-        rows = await ctx.store.list_evidence(limit=100_000)
+    async def _load_events(self, ctx: AgentContext) -> tuple[list[AuthEventView], int, bool]:
+        """Project stored evidence into the rule engine's view type.
+
+        The read is bounded by the configured evidence quota and reports whether
+        that bound cut it short. Rules evaluated over a silently partial timeline
+        would still report confidently, which is the failure mode worth avoiding:
+        a missing window looks identical to a quiet one.
+        """
+        rows, truncated = await ctx.store.all_evidence(
+            cap=ctx.settings.max_evidence_per_investigation, kinds=_EVENT_KINDS
+        )
         events: list[AuthEventView] = []
         undated = 0
         for row in rows:
-            if row.kind not in _EVENT_KINDS:
-                continue
             if row.observed_at is None:
                 undated += 1
             data = row.data or {}
@@ -141,7 +150,7 @@ class LogAnalysisAgent(Agent):
                     invalid_user=bool(data.get("invalid_user", False)),
                 )
             )
-        return events, undated
+        return events, undated, truncated
 
     # --- Finding recording --------------------------------------------------
 
@@ -201,6 +210,28 @@ class LogAnalysisAgent(Agent):
                 reasoning=(
                     "Timestamps are required for windowed correlation. Supplying the log's "
                     "calendar year, or a source with explicit offsets, would close this gap."
+                ),
+            ),
+            agent_run_id=ctx.agent_run_id,
+        )
+        return str(finding.id)
+
+    async def _record_truncation_gap(self, ctx: AgentContext, examined: int) -> str:
+        finding = await ctx.store.add_finding(
+            FindingDraft(
+                title="Detection ran over a truncated evidence set",
+                description=(
+                    f"The evidence quota bounded this read at {examined} event(s). Events "
+                    "beyond the cap were not evaluated, so the absence of a detection in "
+                    "this investigation is not evidence that nothing occurred."
+                ),
+                assertion_class=AssertionClass.UNKNOWN,
+                severity=Severity.INFO,
+                confidence=1.0,
+                reasoning=(
+                    "Reads are bounded so query cost stays predictable. Raising "
+                    "ACIP_MAX_EVIDENCE_PER_INVESTIGATION, or narrowing the submitted "
+                    "log to the window of interest, would close this gap."
                 ),
             ),
             agent_run_id=ctx.agent_run_id,

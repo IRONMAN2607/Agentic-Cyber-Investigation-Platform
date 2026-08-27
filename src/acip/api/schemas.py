@@ -233,6 +233,28 @@ class ToolRunResponse(BaseModel):
     error: str | None
 
 
+class ProvenanceChainResponse(BaseModel):
+    """One observation resolved down to the bytes it came from.
+
+    evidence-model.md s7 requires that, for any statement in the output, the tool,
+    arguments, agent, timestamp and input file that produced it can be named. This
+    is that resolution in a single call, so a client does not have to reassemble
+    the chain from four lookups and infer for itself when a link is missing.
+
+    ``complete`` is false when any link is absent and ``gaps`` says which. A
+    broken chain is stated rather than rendered as a whole one: evidence whose
+    tool run is gone can no longer support a FACT under G1, and a caller that
+    cannot see the difference will present it as though it could.
+    """
+
+    evidence: EvidenceResponse
+    tool_run: ToolRunResponse | None
+    artifact: ArtifactResponse | None
+    agent_run: AgentRunResponse | None
+    complete: bool
+    gaps: list[str]
+
+
 # --- Hypotheses --------------------------------------------------------------
 
 
@@ -345,10 +367,17 @@ class InvestigationDetail(BaseModel):
 
 
 class PagedEvidence(BaseModel):
+    """A page of evidence. Cursor-paged, per api.md s5.
+
+    ``next_cursor`` is null on the final page. It is opaque: clients pass it back
+    verbatim and must not parse it, so the sort key can change without breaking
+    them.
+    """
+
     items: list[EvidenceResponse]
     total: int
     limit: int
-    offset: int
+    next_cursor: str | None = None
 
 
 class StartResponse(BaseModel):

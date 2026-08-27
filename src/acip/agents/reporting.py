@@ -46,7 +46,9 @@ class ReportAgent(Agent):
 
     async def run(self, ctx: AgentContext, inputs: dict[str, Any]) -> AgentResult:
         findings = await ctx.store.list_findings()
-        evidence = await ctx.store.list_evidence(limit=100_000)
+        evidence, evidence_truncated = await ctx.store.all_evidence(
+            cap=ctx.settings.max_evidence_per_investigation
+        )
         agent_runs = await self._agent_runs(ctx)
         tool_runs = await self._tool_runs(ctx)
 
@@ -85,6 +87,7 @@ class ReportAgent(Agent):
                 "characters": len(content),
                 "findings": len(findings),
                 "evidence": len(evidence),
+                "evidence_truncated": evidence_truncated,
                 "severity": assessment.severity.value,
                 "risk_score": assessment.risk_score,
                 "confidence": assessment.confidence,

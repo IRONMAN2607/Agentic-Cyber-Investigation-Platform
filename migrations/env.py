@@ -45,8 +45,9 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """In this scenario we need to create an Engine and associate a connection with the context."""
-    configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = get_settings().database_url
+    configuration = config.get_section(config.config_ini_section, {}) or {}
+    url = config.get_main_option("sqlalchemy.url") or get_settings().database_url
+    configuration["sqlalchemy.url"] = url
 
     connectable = async_engine_from_config(
         configuration,

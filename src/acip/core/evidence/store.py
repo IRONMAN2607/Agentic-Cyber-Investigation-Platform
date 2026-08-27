@@ -24,7 +24,10 @@ behaviour the research is trying to measure.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
+from collections.abc import Collection
+from dataclasses import dataclass
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +39,7 @@ from acip.core.evidence.contracts import (
     HypothesisGapDraft,
     ModelExecutionDraft,
 )
+from acip.core.pagination import decode_cursor, encode_cursor
 from acip.db.models import (
     Evidence,
     Finding,
@@ -45,19 +49,87 @@ from acip.db.models import (
     HypothesisGap,
     ModelExecution,
 )
-from acip.errors import GroundingError
+from acip.errors import GroundingError, ValidationError
 from acip.logging import get_logger
 from acip.types import AssertionClass, EvidenceRole, Severity
 
 logger = get_logger(__name__)
 
+#: Largest page the evidence endpoints will return (api.md s5).
+MAX_EVIDENCE_PAGE = 500
+
+#: Length of the evidence sort key encoded into a cursor.
+_EVIDENCE_SORT_KEY_LENGTH = 4
+
+
+@dataclass(frozen=True, slots=True)
+class EvidencePage:
+    """One page of evidence, plus the cursor that continues it."""
+
+    rows: list[Evidence]
+    next_cursor: str | None
+
+
+def _evidence_cursor(row: Evidence) -> str:
+    """Encode a row's position in the evidence sort order."""
+    return encode_cursor(
+        [
+            1 if row.observed_at is None else 0,
+            row.observed_at.isoformat() if row.observed_at is not None else None,
+            row.collected_at.isoformat(),
+            str(row.id),
+        ]
+    )
+
+
+def _evidence_after(cursor: str) -> sa.ColumnElement[bool]:
+    """Match rows strictly after the cursor, in the evidence sort order."""
+    undated, observed_raw, collected_raw, row_id = decode_cursor(
+        cursor, expected_length=_EVIDENCE_SORT_KEY_LENGTH
+    )
+    try:
+        collected_at = dt.datetime.fromisoformat(str(collected_raw))
+        observed_at = None if observed_raw is None else dt.datetime.fromisoformat(str(observed_raw))
+        cursor_id = uuid.UUID(str(row_id))
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("malformed pagination cursor") from exc
+
+    # Tiebreak among rows sharing an observed_at, ending on the primary key so
+    # the comparison is total.
+    tie = sa.or_(
+        Evidence.collected_at > collected_at,
+        sa.and_(Evidence.collected_at == collected_at, Evidence.id > cursor_id),
+    )
+
+    if undated:
+        # Undated rows sort last, so nothing dated can follow one.
+        return sa.and_(Evidence.observed_at.is_(None), tie)
+    if observed_at is None:
+        raise ValidationError("malformed pagination cursor")
+    return sa.or_(
+        Evidence.observed_at.is_(None),
+        Evidence.observed_at > observed_at,
+        sa.and_(Evidence.observed_at == observed_at, tie),
+    )
+
 
 class EvidenceStore:
     """Writes evidence and findings for a single investigation."""
 
-    def __init__(self, session: AsyncSession, investigation_id: uuid.UUID) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        investigation_id: uuid.UUID,
+        *,
+        max_evidence: int | None = None,
+    ) -> None:
         self._session = session
         self._investigation_id = investigation_id
+        self._max_evidence = max_evidence
+        #: Rows the quota discarded on the most recent :meth:`add_evidence`.
+        #: The tool runner turns a non-zero value into a ``ToolRun`` warning, so
+        #: the loss reaches the report rather than only the log.
+        self.last_quota_dropped = 0
 
     async def add_evidence(
         self,
@@ -90,10 +162,21 @@ class EvidenceStore:
             ).all()
         )
 
+        # database.md s1 bounds what one investigation may store. Retain what
+        # fits and record the shortfall rather than failing the whole tool run:
+        # dropping the observations that fit would lose more than it protects.
+        self.last_quota_dropped = 0
+        headroom: int | None = None
+        if self._max_evidence is not None:
+            headroom = max(0, self._max_evidence - await self.count_evidence())
+
         created: list[Evidence] = []
         seen_in_batch: set[str] = set()
         for draft, content_hash in hashed:
             if content_hash in existing or content_hash in seen_in_batch:
+                continue
+            if headroom is not None and len(created) >= headroom:
+                self.last_quota_dropped += 1
                 continue
             seen_in_batch.add(content_hash)
 
@@ -119,12 +202,22 @@ class EvidenceStore:
             created.append(row)
 
         await self._session.flush()
+        if self.last_quota_dropped:
+            logger.warning(
+                "evidence quota reached; observations discarded",
+                extra={
+                    "source_tool": source_tool,
+                    "quota": self._max_evidence,
+                    "dropped_count": self.last_quota_dropped,
+                },
+            )
         logger.info(
             "evidence recorded",
             extra={
                 "source_tool": source_tool,
                 "created_count": len(created),
-                "duplicates_skipped": len(drafts) - len(created),
+                "duplicates_skipped": len(drafts) - len(created) - self.last_quota_dropped,
+                "quota_dropped": self.last_quota_dropped,
             },
         )
         return created
@@ -341,22 +434,71 @@ class EvidenceStore:
 
     # --- Read paths ---------------------------------------------------------
 
-    async def list_evidence(self, *, limit: int = 500, offset: int = 0) -> list[Evidence]:
-        return list(
+    async def list_evidence(
+        self,
+        *,
+        limit: int = 100,
+        cursor: str | None = None,
+        kinds: Collection[str] | None = None,
+    ) -> EvidencePage:
+        """One page of evidence in timeline order, with a cursor for the next.
+
+        The sort key ends in ``id`` so the ordering is total. Without that
+        tiebreak, rows sharing a timestamp have no defined relative position, and
+        a keyset built on an ambiguous key skips or repeats precisely the rows it
+        lands between — which is also why offset pagination was wrong here.
+        """
+        limit = max(1, min(limit, MAX_EVIDENCE_PAGE))
+
+        stmt = sa.select(Evidence).where(Evidence.investigation_id == self._investigation_id)
+        if kinds is not None:
+            stmt = stmt.where(Evidence.kind.in_(list(kinds)))
+        if cursor:
+            stmt = stmt.where(_evidence_after(cursor))
+
+        # One row beyond the page answers "is there more?" without a second query.
+        rows = list(
             (
                 await self._session.scalars(
-                    sa.select(Evidence)
-                    .where(Evidence.investigation_id == self._investigation_id)
-                    .order_by(
+                    stmt.order_by(
                         Evidence.observed_at.is_(None),
                         Evidence.observed_at,
                         Evidence.collected_at,
-                    )
-                    .limit(limit)
-                    .offset(offset)
+                        Evidence.id,
+                    ).limit(limit + 1)
                 )
             ).all()
         )
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return EvidencePage(
+            rows=rows,
+            next_cursor=_evidence_cursor(rows[-1]) if has_more and rows else None,
+        )
+
+    async def all_evidence(
+        self, *, cap: int, kinds: Collection[str] | None = None
+    ) -> tuple[list[Evidence], bool]:
+        """Every matching row up to ``cap``, and whether the cap cut the read short.
+
+        Callers previously read with ``limit=100_000``, which is not a bound so
+        much as a larger unbounded read. database.md s1 requires reads to be
+        bounded and truncation to be recorded, so the flag is returned rather
+        than logged and forgotten: the caller must decide what to disclose.
+        """
+        collected: list[Evidence] = []
+        cursor: str | None = None
+        while True:
+            remaining = cap - len(collected)
+            if remaining <= 0:
+                return collected, True
+            page = await self.list_evidence(
+                limit=min(MAX_EVIDENCE_PAGE, remaining), cursor=cursor, kinds=kinds
+            )
+            collected.extend(page.rows)
+            if page.next_cursor is None:
+                return collected, False
+            cursor = page.next_cursor
 
     async def list_findings(self) -> list[Finding]:
         return list(
@@ -380,10 +522,12 @@ class EvidenceStore:
             ).all()
         )
 
-    async def count_evidence(self) -> int:
-        result = await self._session.scalar(
+    async def count_evidence(self, *, kinds: Collection[str] | None = None) -> int:
+        stmt = (
             sa.select(sa.func.count())
             .select_from(Evidence)
             .where(Evidence.investigation_id == self._investigation_id)
         )
-        return int(result or 0)
+        if kinds is not None:
+            stmt = stmt.where(Evidence.kind.in_(list(kinds)))
+        return int(await self._session.scalar(stmt) or 0)

@@ -7,8 +7,9 @@ through its lifespan.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+import contextvars
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from typing import Any
 
 from sqlalchemy import event
@@ -18,6 +19,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import ORMExecuteState
+from sqlalchemy.orm import Session as SyncSession
 from sqlalchemy.pool import StaticPool
 
 from acip.db.base import Base
@@ -32,6 +35,62 @@ def _sqlite_pragmas(dbapi_connection: Any, _record: Any) -> None:
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.close()
+
+
+# --- Append-only enforcement at the session boundary -------------------------
+# The mapper events in acip.db.models reject mutation of a *loaded instance*.
+# They never fire for bulk DML: ``session.execute(update(Evidence))`` rewrites
+# history without constructing an Evidence object at all. This guard closes
+# that path for every session in the process.
+#
+# The boundary is worth stating plainly rather than implying the guarantee is
+# total: raw ``session.execute(text("UPDATE evidence ..."))`` bypasses the ORM
+# and is still not covered. Database-level enforcement — revoking grants on
+# PostgreSQL — is Phase 5, and that is what makes the guarantee hold against
+# code that does not go through SQLAlchemy at all.
+
+APPEND_ONLY_TABLES = frozenset({"evidence", "audit_log", "llm_calls"})
+
+_purge_authorized: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "acip_purge_authorized", default=False
+)
+
+
+@contextmanager
+def authorized_purge() -> Iterator[None]:
+    """Permit append-only deletion within this block.
+
+    The single sanctioned destructive path — an audited investigation purge that
+    records what it removed — has to delete evidence. It opts in by name so the
+    exception stays narrow and greppable: one search shows every place the
+    append-only guarantee is deliberately set aside.
+    """
+    token = _purge_authorized.set(True)
+    try:
+        yield
+    finally:
+        _purge_authorized.reset(token)
+
+
+def _forbid_bulk_dml(state: ORMExecuteState) -> None:
+    """Reject bulk UPDATE/DELETE against an append-only table."""
+    if not (state.is_update or state.is_delete):
+        return
+    if _purge_authorized.get():
+        return
+
+    for mapper in state.all_mappers:
+        table = mapper.local_table
+        name = getattr(table, "name", None)
+        if name in APPEND_ONLY_TABLES:
+            verb = "updated" if state.is_update else "deleted"
+            raise RuntimeError(
+                f"{name} is append-only and cannot be {verb} in bulk; "
+                "record a superseding row instead"
+            )
+
+
+event.listen(SyncSession, "do_orm_execute", _forbid_bulk_dml)
 
 
 class Database:

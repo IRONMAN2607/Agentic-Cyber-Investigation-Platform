@@ -134,7 +134,15 @@ def _install_error_handlers(app: FastAPI, settings: Settings) -> None:
     @app.exception_handler(ACIPError)
     async def _acip_error(_request: Request, exc: ACIPError) -> JSONResponse:
         if exc.status_code >= 500:
-            logger.error("request failed", extra={"error_code": exc.code, "message": exc.message})
+            # "message" and "asctime" are reserved on LogRecord: passing either in
+            # extra raises KeyError inside makeRecord, and an exception raised in
+            # an exception handler is not caught by the Exception handler below.
+            # That lost the documented envelope for every 5xx ACIPError, which
+            # includes GroundingError - the one error the platform most needs to
+            # report. tests/security/test_static_invariants.py now blocks the class.
+            logger.error(
+                "request failed", extra={"error_code": exc.code, "error_message": exc.message}
+            )
         return JSONResponse(
             status_code=exc.status_code,
             content={"code": exc.code, "message": exc.message, "detail": exc.detail},

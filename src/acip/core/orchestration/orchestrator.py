@@ -237,7 +237,11 @@ class Orchestrator:
             async with self._db.session() as session:
                 investigation = await _load_investigation(session, investigation_id)
                 artifacts = await _load_artifacts(session, investigation_id)
-                store = EvidenceStore(session, investigation_id)
+                store = EvidenceStore(
+                    session,
+                    investigation_id,
+                    max_evidence=self._settings.max_evidence_per_investigation,
+                )
                 runner = ToolRunner(
                     session=session,
                     investigation_id=investigation_id,

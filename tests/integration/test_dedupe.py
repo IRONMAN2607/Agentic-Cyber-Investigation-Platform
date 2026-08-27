@@ -32,6 +32,7 @@ async def test_evidence_deduplication(database: Database) -> None:
         second_batch = await store.add_evidence([draft], source_tool="auth_parser")
         assert len(second_batch) == 0
 
-        all_evidence = await store.list_evidence()
-        assert len(all_evidence) == 1
-        assert all_evidence[0].id == first_batch[0].id
+        page = await store.list_evidence()
+        assert len(page.rows) == 1
+        assert page.rows[0].id == first_batch[0].id
+        assert page.next_cursor is None

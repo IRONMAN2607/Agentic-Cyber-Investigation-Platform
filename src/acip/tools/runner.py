@@ -145,12 +145,22 @@ class ToolRunner:
             agent_run_id=agent_run_id,
         )
 
+        # A quota drop is a gap in the record, so it travels with the run rather
+        # than only reaching the log: ToolRun.warnings is rendered in the report's
+        # execution trace.
+        warnings = list(result.warnings)
+        if self._store.last_quota_dropped:
+            warnings.append(
+                f"evidence quota reached; {self._store.last_quota_dropped} "
+                "observation(s) were not recorded"
+            )
+
         await self._finalize(
             tool_run,
             started,
             status=RunStatus.SUCCEEDED,
             evidence_count=len(evidence),
-            warnings=result.warnings,
+            warnings=warnings,
             exit_status=result.exit_status,
         )
         logger.info(
