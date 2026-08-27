@@ -1,7 +1,7 @@
 """The migration chain is the schema, so the suite runs on it.
 
 Every fixture reaches its schema through ``bootstrap`` → ``upgrade_to_head``, so
-all 111 tests already exercise the migrations. These tests close the loop by
+all 97 tests already exercise the migrations. These tests close the loop by
 asserting the two things that silent drift would break:
 
 * the database ends up stamped at the chain's head, and

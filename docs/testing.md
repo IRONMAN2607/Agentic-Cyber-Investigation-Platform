@@ -1,6 +1,6 @@
 # Testing Architecture
 
-**Current state: 111 tests passing.** The full test suite covers `unit/`, `integration/`, `api/`, `security/`, and `scenarios/`, verifying grounding invariants G0–G4, append-only immutability, provenance integrity, recovery semantics, and the complete M1 vertical slice.
+**Current state: 97 tests passing.** The full test suite covers `unit/`, `integration/`, `api/`, `security/`, and `scenarios/`, verifying grounding invariants G0–G4, append-only immutability, provenance integrity, recovery semantics, Alembic upgrades, and the complete M1 vertical slice.
 
 That is stated first because §1 is the project's governing rule: never claim something works without
 having verified it. That cuts both ways: the suite below is real and was run, and the gaps in

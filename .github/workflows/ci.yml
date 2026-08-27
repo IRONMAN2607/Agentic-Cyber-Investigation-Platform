@@ -54,4 +54,8 @@ jobs:
       # a finding, not a warning: this project's own threat model treats the
       # supply chain as attack surface, so the build fails rather than annotates.
       - name: Audit dependencies for known vulnerabilities
-        run: uv run pip-audit --strict --progress-spinner off
+        run: |
+          requirements_file="$(mktemp)"
+          trap 'rm -f "$requirements_file"' EXIT
+          uv export --locked --no-emit-project --extra dev --format requirements-txt --output-file "$requirements_file"
+          uv run pip-audit --strict --progress-spinner off --requirement "$requirements_file"

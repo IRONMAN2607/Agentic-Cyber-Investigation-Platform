@@ -26,8 +26,8 @@ path rather than reimplemented as a comparison artefact.
 | 1 | Foundation: config, types, errors, logging, DB, auth, API skeleton | **verified** |
 | 2 | Evidence store, grounding invariants, tool layer, artifact intake | **verified** |
 | 3 | Agents, planner, orchestrator, runner, reporting | **verified** |
-| **1′** | **Verification retrofit** | **substantially complete** — 11 of 15 exit criteria met (111 tests, clean ruff/mypy, live UI); see §3 |
-| 4 | Tool and knowledge expansion; sandboxing; hardening | **next**; some scaffolding landed early and is unwired — see §4 |
+| **1′** | **Verification retrofit** | **substantially complete** — 11 of 15 exit criteria met (97 tests, clean ruff/mypy, live UI); see §3 |
+| 4 | Tool and knowledge expansion; sandboxing; hardening | **next**; no Phase 4 implementation is shipped early |
 | 5 | Evidence graph, correlation, PostgreSQL | not started |
 | 6 | Model abstraction and routing | not started |
 | 7 | Reasoning agents | not started |
@@ -35,19 +35,20 @@ path rather than reimplemented as a comparison artefact.
 | 9 | Evaluation | not started |
 | 10 | Writing | not started |
 
-**"Verified" now means measured, and the measurement is stated here so this table can be checked
-rather than believed.** As of 2026-08-28, on commit `4c5bd35`:
+**"Verified" means a live command result, not a claim inferred from source.** As of 2026-08-28,
+after removing inactive Phase 4 prototypes from the running system:
 
 ```text
-pytest                    111 passed
+pytest                    97 passed
 ruff check src tests      All checks passed!
-ruff format --check       91 files already formatted
-mypy src                  Success: no issues found in 54 source files
+ruff format --check       87 files already formatted
+mypy src                  Success: no issues found in 52 source files
 ```
 
-The vertical slice does execute end to end — `tests/scenarios/test_auth_log_scenario.py` runs create →
+The vertical slice executes end to end — `tests/scenarios/test_auth_log_scenario.py` runs create →
 upload → start → agents → evidence → findings → report against the auth-log fixture, with a clean-log
-negative baseline beside it. `data/acip.db` exists and is stamped at `0003_evidence_provenance_restrict`.
+negative baseline beside it. Every fixture creates its schema by upgrading Alembic to head; the migration
+tests assert both the revision stamp and model/migration parity, including the `0003` SQLite table rebuild.
 
 **Earlier revisions of this section claimed the opposite** — "zero tests run against them", "the
 development database has never been created" — and that text survived long after it stopped being
@@ -55,10 +56,9 @@ true. It is recorded here rather than quietly deleted because a status document 
 project is worse than no status document: it is the one file a reader trusts to know what is real.
 Re-derive these figures from a live run before citing them.
 
-What remains open in Phase 1′ is enumerated in §3 with each criterion marked. The four unmet ones are
-an atomic start claim, a backup/restore integrity check, retention disclosure in the report, and the
-supply-chain and pre-commit gates. None of them block Phase 4; all of them are Phase 1′ debt that is
-now tracked rather than assumed closed.
+What remains open in Phase 1′ is enumerated in §3 with each criterion marked: an atomic start claim,
+a backup/restore integrity check, retention disclosure in the report, and the operating boundary in the
+capability output. These are Phase 1′ debt, tracked explicitly rather than assumed closed.
 
 ## 2. Delivery scope and gates
 
@@ -114,7 +114,7 @@ present.
 
 | # | Criterion | State | Evidence, or what is missing |
 |---|---|---|---|
-| 1 | pytest across the four layers | met | 111 passed; `unit/ integration/ api/ security/` plus `scenarios/` |
+| 1 | pytest across the four layers | met | 97 passed; `unit/ integration/ api/ security/` plus `scenarios/` |
 | 2 | Vertical slice executes | met | `tests/scenarios/test_auth_log_scenario.py`, plus a clean-log baseline |
 | 3 | G0–G4 each raise `GroundingError` | met | `integration/test_grounding.py`; G0's case is `test_grounding_invariant_cross_investigation_isolated` — renaming it would make the mapping legible without inference |
 | 4 | Append-only tested for `evidence`, `audit_log` | met | row-level and bulk-DML cases for both, plus the sanctioned purge |
@@ -123,7 +123,7 @@ present.
 | 7 | Retention state recorded, **reports disclose lost bytes** | **partial** | `retention_state` on `Investigation` and `Artifact`, PATCH-able, and the provenance endpoint discloses a chain ending at derived records; `reporting.py` §9 never mentions retention |
 | 8 | `ruff check` clean | met | `All checks passed!` |
 | 9 | `mypy src` clean | met | 54 source files, no issues |
-| 10 | Alembic **replacing** `create_all()` | **partial** | three revisions apply from empty and `alembic check` reports no drift, but `bootstrap()`, `cli.py init` and every test fixture still build the schema with `create_all()`, so the migrations carry no test coverage |
+| 10 | Alembic **replacing** `create_all()` | met | `bootstrap()`, `acip init`, and every test fixture upgrade Alembic to head; migration tests assert the head stamp and metadata parity, and a static invariant rejects `create_all()` in `src/` |
 | 11 | CI gating, including `pip-audit` | met | `pip-audit` and a `uv.lock` consistency check now gate; CI also runs on all branches |
 | 12 | Pre-commit incl. secret scan | met | `.pre-commit-config.yaml` with `detect-secrets` |
 | 13 | Stale phase refs corrected | met | corrected against this document |
@@ -146,14 +146,14 @@ The largest phase, and the one that changes the threat model.
 - **Sandboxing first.** T1 subprocess isolation, then T2 containers (read-only rootfs,
   `--network=none`, non-root, dropped capabilities, resource limits). No parser handling binary or
   untrusted input ships before its tier exists.
-- **Security controls, some of which now exist as unwired scaffolding.** Landed early and out of
-  order: a sliding-window rate limiter (wired to login only — `investigation_limiter` is defined and
-  unused), `core/security/net.py::validate_url_safe`, `tools/sandbox.py::run_subprocess_sandboxed`
-  (T1), and `core/detection/mitre.py` (G7, with no catalog to load). Each has unit tests and no
-  caller in `src/`, which inflates the suite's apparent coverage; `core/limitations.py` declares them
-  inactive so no report or `/capabilities` response claims them. Still genuinely absent: per-tool
-  timeouts and third-party key handling. SSRF defence is to be *wired* with the first URL tool,
-  alongside its table-driven test, as originally intended.
+- **Security controls land with their first real caller.** The request rate limiter is active on the
+  sensitive current routes. URL/SSRF enforcement, T1 subprocess isolation, and MITRE/G7 mapping were
+  intentionally removed from `src/` because they had no caller and would have made the suite appear to
+  cover running capabilities it did not. The preserved session commit contains their prototypes. Phase
+  4 introduces each only with its integration: SSRF with the first URL tool and redirect test matrix;
+  sandboxing with the first subprocess adapter; and MITRE with a versioned local catalog plus a mapping
+  agent that cannot emit an identifier absent from that catalog. Per-tool timeouts and third-party key
+  handling are also still absent.
 - Network tools: TShark, Zeek, Suricata. Endpoint: EVTX, process/persistence analysis, YARA, Sigma.
 - Threat intelligence (T3): VirusTotal, AbuseIPDB, OTX, Shodan — per-investigation opt-in, every
   lookup recorded, outbound rate limits.

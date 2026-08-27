@@ -202,16 +202,16 @@ Concrete, countable, and all assigned to Phase 1′ unless noted:
 
 | Item | Detail |
 |---|---|
-| Tests | **Zero.** `conftest.py` has eight fixtures; no test file uses them |
-| Vertical slice | **Never executed.** `data/` contains only `.gitkeep` |
-| Lint | 18 `ruff` findings |
-| Types | 11 `mypy` findings. One is genuine — `orchestrator.py:308` types an agent class as bare `type` where `type[Agent]` is meant. The rest are variable-shadowing inference complaints in `reporting.py` and are not runtime bugs |
-| Migrations | `create_all()` only; no Alembic |
-| CI | None |
-| Secret scanning | None |
+| Tests | 97 passing across unit, integration, API, security, and scenario layers |
+| Vertical slice | Executed by `tests/scenarios/test_auth_log_scenario.py` |
+| Lint | `ruff check src tests` clean |
+| Types | `mypy src` clean |
+| Migrations | Alembic upgrade-to-head only; fixture and drift coverage included |
+| CI | GitHub Actions gates lint, format, types, tests, and dependency audit on pushes and pull requests |
+| Secret scanning | `detect-secrets` pre-commit hook with repository baseline |
 | `findings.evidence_ids` | JSON array rather than a join table; blocks CONTRADICTS and G6 until Phase 5 |
 | Phase references in `src/` | Several docstrings cite phase numbers predating [roadmap.md](roadmap.md) |
-| Rate limiting | Absent (Phase 4) |
+| Rate limiting | Login and sensitive investigation routes limited in the current single-process deployment |
 | Object-level authz | Absent (before multi-team use) |
 | Token revocation / refresh | Absent |
 | Model abstraction | Absent (Phase 6) |

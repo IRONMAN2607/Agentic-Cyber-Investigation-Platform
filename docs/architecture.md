@@ -106,7 +106,7 @@ Enforced conventions:
 | ORM | SQLAlchemy 2 (async) | Mature async support; mapper events enforce append-only |
 | DB (dev) | SQLite + aiosqlite | Zero-setup for a 4-person team |
 | DB (prod) | PostgreSQL + asyncpg | Needed from Phase 5 for JSONB, recursive CTEs, real constraints |
-| Migrations | Alembic (Phase 1′) | Currently `create_all`; unacceptable once data matters |
+| Migrations | Alembic | The only schema creation path; migrations are exercised by every test fixture |
 | Passwords | argon2-cffi | Memory-hard KDF; current OWASP guidance |
 | Tokens | PyJWT, HS256 | Symmetric is sufficient for a single-service deployment |
 | Task execution | custom asyncio | See decision below |

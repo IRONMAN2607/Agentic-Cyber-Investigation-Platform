@@ -25,15 +25,15 @@ common way tools like this get compromised:
 | 7 | File upload validation | implemented | `core/security/files.py` |
 | 8 | Path traversal prevention | implemented | `core/security/files.py` |
 | 9 | Command injection prevention | implemented by construction | `tools/base.py` |
-| 10 | Audit logging | implemented | `core/security/audit.py`, append-only |
+| 10 | Audit logging | implemented | `core/audit.py`, append-only |
 | 11 | Malware isolation | **not implemented** | Phase 4 — see §7 |
 | 12 | SSRF protection | **not implemented** | Phase 4 — see §8 |
-| 13 | Rate limiting | **not implemented** | Phase 4 — see §9 |
+| 13 | Rate limiting | implemented for sensitive local routes | `core/security/ratelimit.py`; see §9 |
 | 14 | Container isolation | not implemented | Phase 4 |
 | 15 | Least privilege | partial | §10 |
 | 16 | Transport security | deferred to deployment | [deployment.md](deployment.md) |
 
-Rows 11–13 are the ones that matter most and are the ones missing. **Nothing in the current build
+Rows 11–12 are the ones that matter most and are the ones missing. **Nothing in the current build
 should touch a real malware sample or fetch an attacker-controlled URL.** That is a hard statement,
 not a caveat, and it is why `core/limitations.py` exists.
 

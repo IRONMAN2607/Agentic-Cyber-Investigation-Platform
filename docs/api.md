@@ -142,7 +142,8 @@ by persisted rows, so a stalled agent looks stalled.
 
 ## 7. Rate limiting
 
-**Not implemented.** Required before any non-localhost deployment: login attempts (credential
-stuffing), artifact upload (disk exhaustion), and investigation start (compute exhaustion) all need
-limits. Planned for Phase 4 alongside T3 network tools, which additionally need outbound rate limiting
-to third-party APIs. Tracked in [security.md](security.md).
+**Implemented for the current single-process deployment.** Login, investigation creation, artifact
+upload, and investigation start use an in-memory sliding-window limit keyed by client IP. This prevents
+accidental local resource exhaustion but is not a distributed control: a multi-worker or non-localhost
+deployment still needs a shared limiter, per-user policy, and outbound limits for Phase 4 network tools.
+See [security.md](security.md).

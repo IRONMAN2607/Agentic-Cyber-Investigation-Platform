@@ -22,7 +22,7 @@ the two are not confused.
 | Admin seeding | yes, warns | yes, via fixture | **refused** |
 | Logs | console | `WARNING` console | JSON |
 | Debug detail in errors | `ACIP_DEBUG=true` | off | off |
-| Schema creation | `create_all()` | `create_all()` | Alembic (Phase 1′) |
+| Schema creation | Alembic upgrade to head | Alembic upgrade to head | Alembic upgrade to head |
 
 Two of those rows are fail-closed behaviours rather than preferences, and both are verified in code:
 `Settings._validate_secret()` raises `ConfigurationError` when `prod` has a weak secret, and
@@ -128,8 +128,8 @@ survives while the bytes it was derived from do not, which is the one failure th
 claim cannot tolerate. Restore is verified by checking that every `artifacts.sha256` resolves to a file
 whose digest matches. That check should be a script, not a habit.
 
-**Migrations.** `create_all()` today, which is acceptable only because no data is worth keeping.
-Alembic arrives in Phase 1′ before that stops being true.
+**Migrations.** Alembic is the only schema-creation path. `bootstrap()`, `acip init`, and the test
+fixture all upgrade to head; metadata parity and the head stamp are covered by migration tests.
 
 ## 6. What production would require
 
