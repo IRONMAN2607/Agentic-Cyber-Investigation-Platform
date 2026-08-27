@@ -71,7 +71,7 @@ async def store_stream(
     Raises :class:`PayloadTooLargeError` as soon as the cap is exceeded, and
     :class:`ValidationError` for an empty upload.
     """
-    dest_dir = dest_dir.resolve()
+    dest_dir = dest_dir.resolve()  # noqa: ASYNC240
     staging_dir = dest_dir / "_staging"
     staging_dir.mkdir(parents=True, exist_ok=True)
 

@@ -82,7 +82,7 @@ class ToolRunner:
         agent_run_id: uuid.UUID | None = None,
         artifact_id: uuid.UUID | None = None,
         artifact_path: Path | None = None,
-        timeout: int | None = None,
+        timeout: int | None = None,  # noqa: ASYNC109
     ) -> ToolInvocation:
         """Validate, execute and audit a single tool call."""
         tool = self._registry.get(tool_name)

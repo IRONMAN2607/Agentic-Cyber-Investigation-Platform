@@ -75,9 +75,7 @@ class LogAnalysisAgent(Agent):
             )
             created.extend(invocation.evidence)
             warnings.extend(invocation.result.warnings)
-            parse_metrics.append(
-                {"artifact": artifact.display_id, **invocation.result.metrics}
-            )
+            parse_metrics.append({"artifact": artifact.display_id, **invocation.result.metrics})
 
         matched_total = sum(int(m.get("lines_matched", 0)) for m in parse_metrics)
         if matched_total == 0:
@@ -112,9 +110,7 @@ class LogAnalysisAgent(Agent):
                 "per_artifact": parse_metrics,
                 "warnings": warnings,
             },
-            next_actions=(
-                ["Correlate source addresses with network telemetry"] if hits else []
-            ),
+            next_actions=(["Correlate source addresses with network telemetry"] if hits else []),
             errors=[],
         )
 

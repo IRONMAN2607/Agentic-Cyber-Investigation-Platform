@@ -44,6 +44,14 @@ class RunStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class TaskStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class Severity(StrEnum):
     INFO = "info"
     LOW = "low"
@@ -170,3 +178,39 @@ class AgentCapability(StrEnum):
     TRIAGE = "triage"
     LOG_ANALYSIS = "log_analysis"
     REPORTING = "reporting"
+    HYPOTHESIS = "hypothesis"
+    VALIDATION = "validation"
+
+
+class RetentionState(StrEnum):
+    """Lifecycle retention state of investigation raw artifacts."""
+
+    REPRODUCIBLE = "reproducible"
+    DERIVED_ONLY = "derived_only"
+    MINIMAL_AUDIT_ONLY = "minimal_audit_only"
+
+
+class HypothesisStatus(StrEnum):
+    """Status of a competing explanatory hypothesis."""
+
+    PROPOSED = "proposed"
+    SUPPORTED = "supported"
+    REFUTED = "refuted"
+    UNRESOLVED = "unresolved"
+
+
+class EvidenceRole(StrEnum):
+    """Relationship between an evidence observation and a finding or hypothesis."""
+
+    SUPPORTS = "supports"
+    CONTRADICTS = "contradicts"
+
+
+class FinishReason(StrEnum):
+    """LLM completion termination reason."""
+
+    STOP = "stop"
+    LENGTH = "length"
+    TOOL_CALLS = "tool_calls"
+    CONTENT_FILTER = "content_filter"
+    ERROR = "error"

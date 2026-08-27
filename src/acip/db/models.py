@@ -3,11 +3,12 @@
 Design notes
 ------------
 * No ORM ``relationship()`` declarations. Async SQLAlchemy raises on implicit
-  lazy loads, and every access path in M1 is an explicit query, so relationships
+  lazy loads, and every access path is an explicit query, so relationships
   would add failure modes without adding value.
-* ``Evidence`` is append-only, enforced by mapper-level events at the bottom of
-  this module. Provenance columns (``artifact_id``, ``tool_run_id``,
-  ``agent_run_id``) are what make a finding traceable back to a tool.
+* ``Evidence``, ``AuditLog``, and ``ModelExecution`` are append-only, enforced
+  by mapper-level events at the bottom of this module. Provenance columns
+  (``artifact_id``, ``tool_run_id``, ``agent_run_id``) are what make a finding
+  traceable back to a tool.
 * Enums are stored as strings; see :mod:`acip.types`.
 """
 
@@ -26,11 +27,16 @@ from acip.types import (
     ArtifactKind,
     AssertionClass,
     EvidenceKind,
+    EvidenceRole,
+    FinishReason,
+    HypothesisStatus,
     InvestigationStatus,
+    RetentionState,
     Role,
     RunStatus,
     Severity,
     TargetType,
+    TaskStatus,
     TimeConfidence,
 )
 
@@ -74,6 +80,9 @@ class Investigation(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         sa.ForeignKey("users.id", ondelete="SET NULL"), default=None
     )
+    retention_state: Mapped[str] = mapped_column(
+        sa.String(32), default=RetentionState.REPRODUCIBLE.value
+    )
     created_at: Mapped[dt.datetime] = mapped_column(default=utcnow, index=True)
     started_at: Mapped[dt.datetime | None] = mapped_column(default=None)
     completed_at: Mapped[dt.datetime | None] = mapped_column(default=None)
@@ -91,6 +100,10 @@ class Investigation(Base):
     def target_type_enum(self) -> TargetType:
         return TargetType(self.target_type)
 
+    @property
+    def retention_state_enum(self) -> RetentionState:
+        return RetentionState(self.retention_state)
+
 
 class Artifact(Base):
     """An uploaded input, stored content-addressed under the quarantine dir."""
@@ -106,6 +119,9 @@ class Artifact(Base):
     sha256: Mapped[str] = mapped_column(sa.String(64), index=True)
     size_bytes: Mapped[int] = mapped_column(sa.BigInteger)
     storage_path: Mapped[str] = mapped_column(sa.Text)
+    retention_state: Mapped[str] = mapped_column(
+        sa.String(32), default=RetentionState.REPRODUCIBLE.value
+    )
     uploaded_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(
         sa.ForeignKey("users.id", ondelete="SET NULL"), default=None
@@ -114,6 +130,31 @@ class Artifact(Base):
     @property
     def display_id(self) -> str:
         return f"ART-{str(self.id)[:8].upper()}"
+
+
+class TaskRun(Base):
+    """One scheduled or executed unit of work in an investigation plan."""
+
+    __tablename__ = "task_runs"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[str] = mapped_column(sa.String(64), index=True)
+    task_type: Mapped[str] = mapped_column(sa.String(64), index=True)
+    status: Mapped[str] = mapped_column(sa.String(32), default=TaskStatus.PENDING.value)
+    rationale: Mapped[str | None] = mapped_column(sa.Text, default=None)
+    inputs: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    outputs: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    started_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
+    finished_at: Mapped[dt.datetime | None] = mapped_column(default=None)
+    duration_ms: Mapped[int | None] = mapped_column(default=None)
+    error: Mapped[str | None] = mapped_column(sa.Text, default=None)
+
+    @property
+    def status_enum(self) -> TaskStatus:
+        return TaskStatus(self.status)
 
 
 class AgentRun(Base):
@@ -154,6 +195,7 @@ class ToolRun(Base):
     agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
         sa.ForeignKey("agent_runs.id", ondelete="SET NULL"), default=None
     )
+    task_id: Mapped[str | None] = mapped_column(sa.String(64), default=None)
     tool_name: Mapped[str] = mapped_column(sa.String(64), index=True)
     tool_version: Mapped[str] = mapped_column(sa.String(32))
     sandbox_tier: Mapped[str] = mapped_column(sa.String(32))
@@ -190,9 +232,7 @@ class Evidence(Base):
     source_tool: Mapped[str] = mapped_column(sa.String(64))
 
     observed_at: Mapped[dt.datetime | None] = mapped_column(default=None)
-    time_confidence: Mapped[str] = mapped_column(
-        sa.String(32), default=TimeConfidence.EXACT.value
-    )
+    time_confidence: Mapped[str] = mapped_column(sa.String(32), default=TimeConfidence.EXACT.value)
     collected_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
 
     data: Mapped[dict[str, Any]] = mapped_column(default=dict)
@@ -234,8 +274,7 @@ class Finding(Base):
     severity: Mapped[str] = mapped_column(sa.String(32), default=Severity.INFO.value)
     confidence: Mapped[float] = mapped_column(sa.Float, default=0.5)
 
-    # Evidence ids as text so the report layer can cite them without a join
-    # table; a proper claim/evidence join table arrives with the graph (Phase 5).
+    # Evidence ids as text for backwards-compatible string citations
     evidence_ids: Mapped[list[str]] = mapped_column(default=list)
     reasoning: Mapped[str | None] = mapped_column(sa.Text, default=None)
     detection_rule: Mapped[str | None] = mapped_column(sa.String(128), default=None)
@@ -256,6 +295,136 @@ class Finding(Base):
     @property
     def severity_enum(self) -> Severity:
         return Severity(self.severity)
+
+
+class FindingEvidence(Base):
+    """Relational citation mapping evidence to findings with support/contradict roles."""
+
+    __tablename__ = "finding_evidence"
+    __table_args__ = (
+        sa.UniqueConstraint("finding_id", "evidence_id", "role", name="uq_finding_evidence"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    finding_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("findings.id", ondelete="CASCADE"), index=True
+    )
+    evidence_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("evidence.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(sa.String(32), default=EvidenceRole.SUPPORTS.value)
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
+
+    @property
+    def role_enum(self) -> EvidenceRole:
+        return EvidenceRole(self.role)
+
+
+class Hypothesis(Base):
+    """A competing candidate explanation, requiring a refutation condition (G3)."""
+
+    __tablename__ = "hypotheses"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    statement: Mapped[str] = mapped_column(sa.Text)
+    status: Mapped[str] = mapped_column(
+        sa.String(32), default=HypothesisStatus.PROPOSED.value, index=True
+    )
+    confidence: Mapped[float] = mapped_column(sa.Float, default=0.5)
+    # Refutation condition is NOT NULL, enforcing Invariant G3 at the schema layer
+    refutation_condition: Mapped[str] = mapped_column(sa.Text)
+    agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("agent_runs.id", ondelete="SET NULL"), default=None
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
+
+    @property
+    def display_id(self) -> str:
+        return f"HYP-{str(self.id)[:8].upper()}"
+
+    @property
+    def status_enum(self) -> HypothesisStatus:
+        return HypothesisStatus(self.status)
+
+
+class HypothesisEvidence(Base):
+    """Relational citation linking evidence to a hypothesis."""
+
+    __tablename__ = "hypothesis_evidence"
+    __table_args__ = (
+        sa.UniqueConstraint("hypothesis_id", "evidence_id", "role", name="uq_hypothesis_evidence"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    hypothesis_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("hypotheses.id", ondelete="CASCADE"), index=True
+    )
+    evidence_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("evidence.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(sa.String(32), default=EvidenceRole.SUPPORTS.value)
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
+
+    @property
+    def role_enum(self) -> EvidenceRole:
+        return EvidenceRole(self.role)
+
+
+class HypothesisGap(Base):
+    """Missing evidence or tool capability needed to decide a hypothesis."""
+
+    __tablename__ = "hypothesis_gaps"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    hypothesis_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("hypotheses.id", ondelete="CASCADE"), index=True
+    )
+    description: Mapped[str] = mapped_column(sa.Text)
+    required_tool: Mapped[str | None] = mapped_column(sa.String(64), default=None)
+    resolved: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
+
+
+class ModelExecution(Base):
+    """Audited execution trace of any LLM invocation (append-only research dataset)."""
+
+    __tablename__ = "llm_calls"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("agent_runs.id", ondelete="SET NULL"), default=None
+    )
+    task_id: Mapped[str | None] = mapped_column(sa.String(64), default=None)
+    task_class: Mapped[str] = mapped_column(sa.String(64))
+    provider: Mapped[str] = mapped_column(sa.String(64))
+    model: Mapped[str] = mapped_column(sa.String(128))
+    prompt_name: Mapped[str] = mapped_column(sa.String(128))
+    prompt_version: Mapped[str] = mapped_column(sa.String(32))
+
+    tokens_in: Mapped[int] = mapped_column(sa.Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(sa.Integer, default=0)
+    latency_ms: Mapped[int] = mapped_column(sa.Integer, default=0)
+    cost_estimate_usd: Mapped[float] = mapped_column(sa.Float, default=0.0)
+
+    finish_reason: Mapped[str] = mapped_column(sa.String(32), default=FinishReason.STOP.value)
+    retries: Mapped[int] = mapped_column(sa.Integer, default=0)
+    schema_valid: Mapped[bool] = mapped_column(default=True)
+    fallback_from: Mapped[str | None] = mapped_column(sa.String(128), default=None)
+    temperature: Mapped[float] = mapped_column(sa.Float, default=0.0)
+    seed: Mapped[int | None] = mapped_column(sa.Integer, default=None)
+    nondeterminism_risk: Mapped[str] = mapped_column(sa.String(32), default="low")
+    grounding_violations: Mapped[int] = mapped_column(sa.Integer, default=0)
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow, index=True)
+
+    @property
+    def finish_reason_enum(self) -> FinishReason:
+        return FinishReason(self.finish_reason)
 
 
 class Report(Base):
@@ -289,18 +458,15 @@ class AuditLog(Base):
 
 
 # --- Append-only enforcement -------------------------------------------------
-# Evidence and audit records are immutable. Enforcing this at the mapper means a
-# mistake anywhere in the codebase fails loudly instead of silently rewriting
-# history. Database-level enforcement (revoked UPDATE/DELETE grants) is added
-# with the PostgreSQL migration in Phase 5.
+# Evidence, audit records, and model execution traces are immutable.
+# Enforcing this at the mapper means a mistake anywhere in the codebase
+# fails loudly instead of silently rewriting history.
 
 
 def _forbid_mutation(mapper: Any, connection: Any, target: Any) -> None:
-    raise RuntimeError(
-        f"{type(target).__name__} is append-only and cannot be modified or deleted"
-    )
+    raise RuntimeError(f"{type(target).__name__} is append-only and cannot be modified or deleted")
 
 
-for _model in (Evidence, AuditLog):
+for _model in (Evidence, AuditLog, ModelExecution):
     event.listen(_model, "before_update", _forbid_mutation)
     event.listen(_model, "before_delete", _forbid_mutation)

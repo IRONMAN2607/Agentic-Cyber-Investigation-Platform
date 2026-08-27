@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from acip.errors import AuthenticationError
 from acip.types import Role
 
-TOKEN_TYPE_ACCESS = "access"
+TOKEN_TYPE_ACCESS = "access"  # noqa: S105
 
 
 class TokenPayload(BaseModel):

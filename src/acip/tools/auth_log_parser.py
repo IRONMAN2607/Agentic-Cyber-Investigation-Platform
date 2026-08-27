@@ -60,7 +60,9 @@ _MESSAGE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
     (
         "invalid_user",
-        re.compile(r"^Invalid user (?P<user>\S*) from (?P<ip>[\da-fA-F:.]+)(?: port (?P<port>\d+))?"),
+        re.compile(
+            r"^Invalid user (?P<user>\S*) from (?P<ip>[\da-fA-F:.]+)(?: port (?P<port>\d+))?"
+        ),
     ),
     (
         "max_auth_attempts",
@@ -122,9 +124,7 @@ class LinuxAuthLogParser(ToolAdapter):
     version: ClassVar[str] = "1.0.0"
     tier: ClassVar[SandboxTier] = SandboxTier.T0_IN_PROCESS
     args_model: ClassVar[type[BaseModel]] = AuthLogParserArgs
-    description: ClassVar[str] = (
-        "Parses sshd/sudo/PAM authentication records from Linux auth logs."
-    )
+    description: ClassVar[str] = "Parses sshd/sudo/PAM authentication records from Linux auth logs."
     requires_artifact: ClassVar[bool] = True
 
     async def execute(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
@@ -138,7 +138,12 @@ class LinuxAuthLogParser(ToolAdapter):
         return self.parse_text(text, args, lossy=lossy)
 
     def parse_text(
-        self, text: str, args: AuthLogParserArgs, *, lossy: bool = False, now: dt.datetime | None = None
+        self,
+        text: str,
+        args: AuthLogParserArgs,
+        *,
+        lossy: bool = False,
+        now: dt.datetime | None = None,
     ) -> ToolResult:
         """Parse log text. Separated from :meth:`execute` so it is directly testable."""
         reference_now = now or dt.datetime.now(dt.UTC)
@@ -229,7 +234,7 @@ class LinuxAuthLogParser(ToolAdapter):
         pid = int(groups["pid"]) if groups.get("pid") else None
         message = groups.get("msg") or ""
 
-        if "ts" in groups and groups["ts"]:
+        if groups.get("ts"):
             timestamp, confidence = self._parse_iso(groups["ts"])
         else:
             timestamp, confidence = self._parse_bsd(
@@ -263,9 +268,7 @@ class LinuxAuthLogParser(ToolAdapter):
 
         def build(year: int) -> dt.datetime | None:
             try:
-                return dt.datetime(
-                    year, month, int(day), hour, minute, second, tzinfo=dt.UTC
-                )
+                return dt.datetime(year, month, int(day), hour, minute, second, tzinfo=dt.UTC)
             except ValueError:
                 return None  # e.g. 29 Feb in a non-leap year
 

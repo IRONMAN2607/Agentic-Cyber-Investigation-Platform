@@ -375,28 +375,28 @@ class ReportAgent(Agent):
         add("")
         add("| Agent | Version | Status | Duration (ms) | Why it ran |")
         add("| --- | --- | --- | --- | --- |")
-        for run in agent_runs:
+        for a_run in agent_runs:
             add(
-                f"| `{run.agent_name}` | {run.agent_version} | {run.status} "
-                f"| {run.duration_ms if run.duration_ms is not None else '-'} "
-                f"| {_cell(run.rationale or '-')} |"
+                f"| `{a_run.agent_name}` | {a_run.agent_version} | {a_run.status} "
+                f"| {a_run.duration_ms if a_run.duration_ms is not None else '-'} "
+                f"| {_cell(a_run.rationale or '-')} |"
             )
         add("")
         add("| Tool | Version | Tier | Status | Duration (ms) | Evidence |")
         add("| --- | --- | --- | --- | --- | --- |")
-        for run in tool_runs:
+        for t_run in tool_runs:
             add(
-                f"| `{run.tool_name}` | {run.tool_version} | {run.sandbox_tier} "
-                f"| {run.status} | {run.duration_ms if run.duration_ms is not None else '-'} "
-                f"| {run.evidence_count} |"
+                f"| `{t_run.tool_name}` | {t_run.tool_version} | {t_run.sandbox_tier} "
+                f"| {t_run.status} | {t_run.duration_ms if t_run.duration_ms is not None else '-'} "
+                f"| {t_run.evidence_count} |"
             )
         add("")
-        failed = [run for run in tool_runs if run.status == RunStatus.FAILED.value]
+        failed = [f_run for f_run in tool_runs if f_run.status == RunStatus.FAILED.value]
         if failed:
             add("**Failed tool invocations.**")
             add("")
-            for run in failed:
-                add(f"- `{run.tool_name}`: {_cell(run.error or 'unknown error')}")
+            for f_run in failed:
+                add(f"- `{f_run.tool_name}`: {_cell(f_run.error or 'unknown error')}")
             add("")
 
     def _section_limitations(self, add: Any, findings: list[Finding]) -> None:

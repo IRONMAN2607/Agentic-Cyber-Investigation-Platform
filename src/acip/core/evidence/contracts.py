@@ -20,6 +20,8 @@ from acip.types import (
     AssertionClass,
     EntityType,
     EvidenceKind,
+    EvidenceRole,
+    FinishReason,
     Severity,
     TimeConfidence,
 )
@@ -35,7 +37,10 @@ def normalize_entity_value(entity_type: EntityType, value: str) -> str:
     match entity_type:
         case EntityType.IP:
             # Collapses forms such as 2001:0db8::0001 and 203.0.113.045.
-            return str(ipaddress.ip_address(candidate))
+            try:
+                return str(ipaddress.ip_address(candidate))
+            except ValueError:
+                return candidate
         case EntityType.DOMAIN:
             return candidate.rstrip(".").lower()
         case EntityType.URL:
@@ -141,3 +146,62 @@ class FindingDraft(BaseModel):
         default=None,
         description="Identifier of the deterministic rule that fired, when applicable.",
     )
+
+
+class FindingEvidenceDraft(BaseModel):
+    """A citation connecting evidence to a finding with a supporting or contradicting role."""
+
+    finding_id: uuid.UUID
+    evidence_id: uuid.UUID
+    role: EvidenceRole = EvidenceRole.SUPPORTS
+
+
+class HypothesisDraft(BaseModel):
+    """A competing candidate explanation under evaluation (Invariant G3)."""
+
+    statement: str = Field(min_length=1, max_length=4096)
+    refutation_condition: str = Field(
+        min_length=1,
+        max_length=4096,
+        description="A falsifiable condition that would refute this hypothesis (Invariant G3).",
+    )
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    supporting_evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    contradicting_evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+
+    @field_validator("statement", "refutation_condition")
+    @classmethod
+    def _non_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be empty or whitespace only")
+        return stripped
+
+
+class HypothesisGapDraft(BaseModel):
+    """A declared gap in evidence preventing resolution of a hypothesis."""
+
+    description: str = Field(min_length=1, max_length=4096)
+    required_tool: str | None = None
+
+
+class ModelExecutionDraft(BaseModel):
+    """Structured record of an LLM call for experimental tracking."""
+
+    task_class: str = Field(min_length=1, max_length=64)
+    provider: str = Field(min_length=1, max_length=64)
+    model: str = Field(min_length=1, max_length=128)
+    prompt_name: str = Field(min_length=1, max_length=128)
+    prompt_version: str = Field(min_length=1, max_length=32)
+    tokens_in: int = Field(default=0, ge=0)
+    tokens_out: int = Field(default=0, ge=0)
+    latency_ms: int = Field(default=0, ge=0)
+    cost_estimate_usd: float = Field(default=0.0, ge=0.0)
+    finish_reason: FinishReason = FinishReason.STOP
+    retries: int = Field(default=0, ge=0)
+    schema_valid: bool = True
+    fallback_from: str | None = None
+    temperature: float = Field(default=0.0, ge=0.0)
+    seed: int | None = None
+    nondeterminism_risk: str = "low"
+    grounding_violations: int = Field(default=0, ge=0)

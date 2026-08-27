@@ -85,8 +85,7 @@ class StaticPlanner:
         log_like = [
             artifact
             for artifact in artifacts
-            if artifact.kind
-            in {ArtifactKind.LINUX_AUTH_LOG.value, ArtifactKind.GENERIC_TEXT.value}
+            if artifact.kind in {ArtifactKind.LINUX_AUTH_LOG.value, ArtifactKind.GENERIC_TEXT.value}
             or artifact.kind == ArtifactKind.UNKNOWN.value
         ]
         if log_like:

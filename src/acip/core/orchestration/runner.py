@@ -21,6 +21,9 @@ import contextlib
 import datetime as dt
 import uuid
 
+import sqlalchemy as sa
+
+from acip.core import audit
 from acip.core.orchestration.orchestrator import Orchestrator
 from acip.db.models import Investigation
 from acip.db.session import Database
@@ -58,7 +61,22 @@ class InvestigationRunner:
     def in_flight(self) -> int:
         return len(self._tasks)
 
-    async def wait_all(self, timeout: float | None = None) -> None:
+    async def cancel(self, investigation_id: uuid.UUID) -> bool:
+        """Cancel an in-flight investigation task."""
+        for task in list(self._tasks):
+            if task.get_name() == f"investigation-{investigation_id}":
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
+                await self._mark_failed(
+                    investigation_id,
+                    "investigation cancelled by user",
+                    status=InvestigationStatus.HALTED,
+                )
+                return True
+        return False
+
+    async def wait_all(self, timeout: float | None = None) -> None:  # noqa: ASYNC109
         """Await every scheduled investigation. Used by tests and shutdown."""
         if not self._tasks:
             return
@@ -71,7 +89,7 @@ class InvestigationRunner:
                 extra={"count": len(still_pending)},
             )
 
-    async def shutdown(self, timeout: float = 30.0) -> None:
+    async def shutdown(self, timeout: float = 30.0) -> None:  # noqa: ASYNC109
         """Cancel outstanding work after giving it a chance to finish."""
         await self.wait_all(timeout=timeout)
         for task in list(self._tasks):
@@ -80,32 +98,70 @@ class InvestigationRunner:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
 
+    async def recover_interrupted(self) -> int:
+        """Mark orphan running investigations as interrupted on startup."""
+        async with self._db.session() as session:
+            rows = (
+                await session.scalars(
+                    sa.select(Investigation).where(
+                        Investigation.status == InvestigationStatus.RUNNING.value
+                    )
+                )
+            ).all()
+            recovered = 0
+            now = dt.datetime.now(dt.UTC)
+            for inv in rows:
+                inv.status = InvestigationStatus.FAILED.value
+                inv.completed_at = now
+                inv.error = "interrupted: server restarted while execution was in progress"
+                recovered += 1
+                await audit.record(
+                    session,
+                    actor="system",
+                    action=audit.INVESTIGATION_FINISHED,
+                    resource_type="investigation",
+                    resource_id=str(inv.id),
+                    outcome=audit.FAILURE,
+                    detail={"reason": "server restarted during execution"},
+                )
+            if recovered:
+                logger.warning(
+                    "recovered interrupted investigations",
+                    extra={"count": recovered},
+                )
+            return recovered
+
     async def _guarded(self, investigation_id: uuid.UUID) -> None:
         async with self._semaphore:
             try:
                 await self._orchestrator.execute(investigation_id)
             except asyncio.CancelledError:
-                await self._mark_failed(investigation_id, "execution was cancelled")
+                await self._mark_failed(
+                    investigation_id,
+                    "execution was cancelled",
+                    status=InvestigationStatus.HALTED,
+                )
                 raise
-            except Exception as exc:  # noqa: BLE001 - persisted, not swallowed
+            except Exception as exc:
                 logger.exception(
                     "orchestrator crashed",
                     extra={"investigation_id": str(investigation_id)},
                 )
                 await self._mark_failed(investigation_id, f"{type(exc).__name__}: {exc}")
 
-    async def _mark_failed(self, investigation_id: uuid.UUID, reason: str) -> None:
-        """Record an orchestrator-level crash on the investigation row.
-
-        Without this an investigation would sit at ``running`` forever, which
-        reads as "still working" when nothing is.
-        """
+    async def _mark_failed(
+        self,
+        investigation_id: uuid.UUID,
+        reason: str,
+        status: InvestigationStatus = InvestigationStatus.FAILED,
+    ) -> None:
+        """Record an orchestrator-level crash on the investigation row."""
         try:
             async with self._db.session() as session:
                 investigation = await session.get(Investigation, investigation_id)
                 if investigation is None:
                     return
-                investigation.status = InvestigationStatus.FAILED.value
+                investigation.status = status.value
                 investigation.completed_at = dt.datetime.now(dt.UTC)
                 investigation.error = reason
         except Exception:

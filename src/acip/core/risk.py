@@ -88,7 +88,8 @@ def assess(findings: Sequence[ScorableFinding]) -> RiskAssessment:
     risk_score = int(min(100.0, round(score)))
     confidence = round(weighted_confidence / weight_total, 3) if weight_total else 0.0
     breakdown = ", ".join(
-        f"{count} {severity.value}" for severity, count in sorted(counts.items(), key=lambda kv: -kv[0].rank)
+        f"{count} {severity.value}"
+        for severity, count in sorted(counts.items(), key=lambda kv: -kv[0].rank)
     )
     return RiskAssessment(
         severity=top,

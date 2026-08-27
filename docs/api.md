@@ -61,12 +61,15 @@ shared multi-tenant use, and stated as such rather than left implicit.
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | `GET` | `/health` | none | Liveness + database reachability |
-| `GET` | `/capabilities` | none | **Honest** capability report |
+| `GET` | `/capabilities` | none | Coarse local capability report |
+| `GET` | `/admin/capabilities` | admin | Detailed diagnostic report |
 
-`/capabilities` reports registered agents, registered tools with live `probe()` results, and the
-declared limitations from `core/limitations.py`. It is the mechanism that stops the UI from implying a
-capability the deployment lacks (§31). It is unauthenticated so a deployment can be inspected before
-credentials exist; it exposes no investigation data.
+`/capabilities` reports only coarse feature flags and declared limitations, sufficient for a local UI
+to avoid implying unavailable functionality. It exposes no investigation data, tool versions, sandbox
+details, probe reasons, paths, or configuration. The authenticated administrator-only
+`/admin/capabilities` endpoint contains registered agents and tools with live `probe()` diagnostics.
+This preserves honest local diagnostics without providing reconnaissance detail if the deployment
+boundary later changes.
 
 ### Auth
 
@@ -79,20 +82,28 @@ credentials exist; it exposes no investigation data.
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| `POST` | `/investigations` | investigator | Create |
-| `GET` | `/investigations` | viewer | List |
-| `GET` | `/investigations/{id}` | viewer | Detail: status, plan, runs, findings |
-| `POST` | `/investigations/{id}/artifacts` | investigator | Multipart upload |
-| `POST` | `/investigations/{id}/start` | investigator | Queue; returns immediately |
-| `GET` | `/investigations/{id}/evidence` | viewer | Paged, filterable by `kind` |
-| `GET` | `/investigations/{id}/report` | viewer | Generated report |
+| `POST` | `/investigations` | investigator | Create investigation in `created` status |
+| `GET` | `/investigations` | viewer | List investigations with optional `status` & `target_type` filters |
+| `GET` | `/investigations/{id}` | viewer | Detail: workspace state, artifacts, runs, findings, counts |
+| `PATCH` | `/investigations/{id}` | investigator | Update investigation metadata (`title`, `target_value`, `retention_state`) |
+| `GET` | `/investigations/{id}/progress` | viewer | Real-time progress metric, completion percentage, task counts |
+| `GET` | `/investigations/{id}/tasks` | viewer | List planned and executed `TaskRun` rows with status & duration |
+| `POST` | `/investigations/{id}/tasks` | investigator | Manually append or schedule dynamic task |
+| `POST` | `/investigations/{id}/artifacts` | investigator | Multipart upload into quarantine storage (before start) |
+| `POST` | `/investigations/{id}/start` | investigator | Queue investigation; returns immediately |
+| `POST` | `/investigations/{id}/cancel` | investigator | Cancel in-flight run and transition to `halted` status |
+| `POST` | `/investigations/{id}/retry` | investigator | Re-queue failed, halted, or partial investigation |
+| `GET` | `/investigations/{id}/evidence` | viewer | Paged evidence query, filterable by `kind` |
+| `GET` | `/investigations/{id}/report` | viewer | Generated report (audited on read) |
+| `DELETE` | `/investigations/{id}` | investigator | Delete investigation with cascade and audit record |
 
 `start` returns `202`-style semantics with a `StartResponse` rather than blocking: it commits the
 status transition **before** scheduling, so the background task cannot race the request transaction for
-the row. Progress is observed by polling the detail endpoint.
+the row. Progress is observed by polling `/investigations/{id}/progress` or `/investigations/{id}`.
 
 Re-starting a non-`created` investigation is a `409`, not an idempotent no-op — silently ignoring it
-would hide a client bug and could double-run tools.
+would hide a client bug and could double-run tools. For re-running failed or halted work, use
+`POST /investigations/{id}/retry`.
 
 ### Planned
 
@@ -118,8 +129,9 @@ by persisted rows, so a stalled agent looks stalled.
 
 ## 6. Conventions
 
-- **Pagination** — `limit` (≤500) / `offset`, with `total`. Cursor pagination if evidence volumes
-  demand it.
+- **Pagination** — use stable cursor pagination for investigation records, evidence, entities,
+  timeline, audit, and run history. Each endpoint specifies a bounded `limit` (≤500) and an opaque
+  cursor derived from a deterministic sort key; offset pagination is not part of the public contract.
 - **Timestamps** — ISO 8601 UTC with offset, always.
 - **Ids** — UUIDs in payloads; `INV-`/`EVD-`/`FND-` display forms are additional fields, never
   substitutes.

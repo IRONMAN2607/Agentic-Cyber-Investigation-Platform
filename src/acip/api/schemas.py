@@ -21,11 +21,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from acip.types import (
     ArtifactKind,
     AssertionClass,
+    EvidenceRole,
+    FinishReason,
+    HypothesisStatus,
     InvestigationStatus,
+    RetentionState,
     Role,
     RunStatus,
     Severity,
     TargetType,
+    TaskStatus,
     TimeConfidence,
 )
 
@@ -42,7 +47,7 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105
     expires_in_seconds: int
     user: UserResponse
 
@@ -81,6 +86,7 @@ class ArtifactResponse(BaseModel):
     original_filename: str
     sha256: str
     size_bytes: int
+    retention_state: RetentionState = RetentionState.REPRODUCIBLE
     uploaded_at: dt.datetime
 
 
@@ -96,10 +102,34 @@ class InvestigationResponse(BaseModel):
     severity: Severity | None
     confidence: float | None
     risk_score: int | None
+    retention_state: RetentionState = RetentionState.REPRODUCIBLE
     created_at: dt.datetime
     started_at: dt.datetime | None
     completed_at: dt.datetime | None
     error: str | None
+
+
+class InvestigationUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    target_value: str | None = Field(default=None, min_length=1, max_length=4096)
+    retention_state: RetentionState | None = None
+
+
+class InvestigationProgress(BaseModel):
+    investigation_id: uuid.UUID
+    status: InvestigationStatus
+    total_tasks: int
+    completed_tasks: int
+    failed_tasks: int
+    running_task: str | None = None
+    percent_complete: float
+
+
+class TaskCreate(BaseModel):
+    task_type: str = Field(min_length=1, max_length=64)
+    agent_name: str = Field(min_length=1, max_length=64)
+    rationale: str | None = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvidenceResponse(BaseModel):
@@ -122,6 +152,16 @@ class EvidenceResponse(BaseModel):
     agent_run_id: uuid.UUID | None
 
 
+class FindingEvidenceResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    finding_id: uuid.UUID
+    evidence_id: uuid.UUID
+    role: EvidenceRole
+    created_at: dt.datetime
+
+
 class FindingResponse(BaseModel):
     """A claim, inseparable from its epistemic status and support."""
 
@@ -139,6 +179,23 @@ class FindingResponse(BaseModel):
     detection_rule: str | None
     agent_run_id: uuid.UUID | None
     created_at: dt.datetime
+
+
+class TaskRunResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    task_id: str
+    task_type: str
+    status: TaskStatus
+    rationale: str | None
+    inputs: dict[str, Any]
+    outputs: dict[str, Any]
+    started_at: dt.datetime
+    finished_at: dt.datetime | None
+    duration_ms: int | None
+    error: str | None
 
 
 class AgentRunResponse(BaseModel):
@@ -162,6 +219,7 @@ class ToolRunResponse(BaseModel):
 
     id: uuid.UUID
     agent_run_id: uuid.UUID | None
+    task_id: str | None = None
     tool_name: str
     tool_version: str
     sandbox_tier: str
@@ -173,6 +231,96 @@ class ToolRunResponse(BaseModel):
     finished_at: dt.datetime | None
     duration_ms: int | None
     error: str | None
+
+
+# --- Hypotheses --------------------------------------------------------------
+
+
+class HypothesisCreate(BaseModel):
+    statement: str = Field(min_length=1, max_length=4096)
+    refutation_condition: str = Field(min_length=1, max_length=4096)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class HypothesisEvidenceResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    hypothesis_id: uuid.UUID
+    evidence_id: uuid.UUID
+    role: EvidenceRole
+    created_at: dt.datetime
+
+
+class HypothesisGapResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    hypothesis_id: uuid.UUID
+    description: str
+    required_tool: str | None
+    resolved: bool
+    created_at: dt.datetime
+
+
+class HypothesisResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    display_id: str
+    investigation_id: uuid.UUID
+    statement: str
+    status: HypothesisStatus
+    confidence: float
+    refutation_condition: str
+    agent_run_id: uuid.UUID | None
+    created_at: dt.datetime
+
+
+# --- Model Executions (LLM Calls) --------------------------------------------
+
+
+class ModelExecutionResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    agent_run_id: uuid.UUID | None
+    task_id: str | None
+    task_class: str
+    provider: str
+    model: str
+    prompt_name: str
+    prompt_version: str
+    tokens_in: int
+    tokens_out: int
+    latency_ms: int
+    cost_estimate_usd: float
+    finish_reason: FinishReason
+    retries: int
+    schema_valid: bool
+    fallback_from: str | None
+    temperature: float
+    seed: int | None
+    nondeterminism_risk: str
+    grounding_violations: int
+    created_at: dt.datetime
+
+
+# --- Audit & Reports ---------------------------------------------------------
+
+
+class AuditLogResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    ts: dt.datetime
+    actor: str
+    action: str
+    resource_type: str
+    resource_id: str | None
+    outcome: str
+    detail: dict[str, Any]
 
 
 class ReportResponse(BaseModel):
@@ -234,6 +382,16 @@ class CapabilitiesResponse(BaseModel):
     ``not_implemented`` is served from the same source the report renders, so the
     API and the report cannot disagree about the platform's limits.
     """
+
+    environment: str
+    tools: list[str]
+    agents: list[str]
+    planner: str
+    not_implemented: list[str]
+
+
+class AdminCapabilitiesResponse(BaseModel):
+    """Detailed diagnostic report for administrators."""
 
     environment: str
     tools: list[ToolCapability]

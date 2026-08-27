@@ -1,5 +1,11 @@
 # Deployment and Operations
 
+**Supported deployment boundary:** one trusted developer on localhost, using synthetic or sanitised
+data only. The current build is **not supported** for a shared lab, a second user, a campus/network
+binding, internet exposure, real client data, or live malware. Authentication does not supply
+per-investigation isolation; loopback binding is therefore a product constraint, not a convenience.
+Changing this boundary requires a deployment-readiness review covering the controls in §6.
+
 Covers §30. **Current supported deployment: one developer machine, bound to localhost.** Anything
 beyond that requires the controls in [security.md](security.md) §1 rows 11–13 and 16, which do not
 exist yet. This document describes what runs today and what production would require, kept separate so

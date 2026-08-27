@@ -132,13 +132,9 @@ LLM-backed planners to be swappable behind one interface — already achieved by
 protocol. Celery/Dramatiq would introduce a broker for work that is currently in-process text
 parsing. Temporal is operationally heavy for a four-person capstone.
 
-**Accepted cost:** investigations do not survive an API restart, there is no horizontal scale, and
-concurrency is capped at 2. For a research prototype evaluated in batch runs this is acceptable and
-honest.
+**Accepted cost:** execution remains single-process and single-worker. A restart cannot resume work; instead, Phase 1′ defines deterministic recovery: at startup, the runner marks every `queued` or `running` investigation and agent run without a live in-process owner as `interrupted`, records an audit reason, and requires an explicit retry that creates a new attempt. A database-backed claim prevents duplicate starts while the supported single worker is running. This is a recoverable local prototype, not durable job execution or horizontal scale.
 
-**Revisit at Phase 4**, when container-isolated tools make out-of-process execution mandatory. The
-seam is `InvestigationRunner.submit()` — its body becomes a queue publish, and the durability
-requirement is then real rather than hypothetical.
+**Revisit when:** container-isolated tools, a second worker, or any need to resume work after restart requires an external queue. `InvestigationRunner.submit()` is the seam; its body then becomes a queue publish, with leases and heartbeats owned by that queue.
 
 ### Decision — SQLite now, PostgreSQL from Phase 5
 

@@ -88,13 +88,15 @@ attaches to edges instead, via `entity_edges.evidence_id`.
 | `CONTACTED` | PROCESS/HOST → DOMAIN/IP | network |
 | `RESOLVES_TO` | DOMAIN → IP | DNS |
 | `LISTENS_ON` / `CONNECTED_TO_PORT` | HOST → PORT | network |
-| `ASSOCIATED_WITH` | any → any | intel; weakest relation, always carries a source |
+| `ASSOCIATED_WITH` | any → any | intel; inferred/weak relation, always carries source, basis, and confidence |
 | `MAPPED_TO` | FINDING → TECHNIQUE | ATT&CK agent |
 
-`SUPPORTS` and `CONTRADICTS` from §10 are **not** entity edges. They relate a *finding or hypothesis*
-to *evidence*, not one entity to another, and live in `finding_evidence.role` and
-`hypothesis_evidence.role` (see [database.md](database.md)). Keeping epistemic relations out of the
-entity graph prevents a query for "what did this user touch" from returning argumentative structure.
+`entity_edges` stores **edge instances**: each row is one relationship asserted by one evidence row.
+The `evidence_id` uniqueness component therefore preserves multiple independent observations of the
+same logical relationship; consumers may group them only by an explicit, reproducible query. Direct
+observations and inferred relations (including `ASSOCIATED_WITH`) are separately filterable and the
+UI defaults to direct observations. Confidence is derived from declared source/basis rules and is
+never overwritten by an LLM.
 
 ## 4. Entity resolution
 
@@ -152,9 +154,10 @@ GET /findings/{id}/subgraph                         what supports and contradict
 ```
 
 Every edge in a graph response carries its `evidence_id`, so the UI can make any relationship
-clickable through to the observation that produced it. A graph edge the user cannot trace to evidence
-would undermine the platform's central claim. Rendering is specified in [api.md](api.md) and the
-frontend section of [architecture.md](architecture.md).
+clickable through to the observation that produced it. Graph responses enforce a bounded depth, result
+cap, execution timeout, cancellation, and the same investigation authorization check as other
+investigation data. A graph edge the user cannot trace to evidence would undermine the platform's
+central claim.
 
 ## 7. Research relevance
 

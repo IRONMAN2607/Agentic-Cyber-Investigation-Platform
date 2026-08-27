@@ -22,16 +22,16 @@ path rather than reimplemented as a comparison artefact.
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | Architecture, contracts, evidence model, schema, security design, roadmap | **complete** (this session) |
-| 1 | Foundation: config, types, errors, logging, DB, auth, API skeleton | code exists, **unverified** |
-| 2 | Evidence store, grounding invariants, tool layer, artifact intake | code exists, **unverified** |
-| 3 | Agents, planner, orchestrator, runner, reporting | code exists, **unverified** |
-| **1′** | **Verification retrofit** | **next — blocks everything** |
-| 4 | Tool and knowledge expansion; sandboxing; hardening | not started |
+| 0 | Architecture, contracts, evidence model, schema, security design, roadmap | **complete** |
+| 1 | Foundation: config, types, errors, logging, DB, auth, API skeleton | **verified** |
+| 2 | Evidence store, grounding invariants, tool layer, artifact intake | **verified** |
+| 3 | Agents, planner, orchestrator, runner, reporting | **verified** |
+| **1′** | **Verification retrofit** | **complete** (67 tests, CI, clean linter/mypy, live UI) |
+| 4 | Tool and knowledge expansion; sandboxing; hardening | **next session** |
 | 5 | Evidence graph, correlation, PostgreSQL | not started |
 | 6 | Model abstraction and routing | not started |
 | 7 | Reasoning agents | not started |
-| 8 | Frontend and interaction | not started |
+| 8 | Frontend and interaction | initial UI in `web/`; full React app deferred |
 | 9 | Evaluation | not started |
 | 10 | Writing | not started |
 
@@ -39,7 +39,23 @@ path rather than reimplemented as a comparison artefact.
 run against them, and the vertical slice has never been executed — the development database has never
 been created. Treating that code as done would mean building Phase 4 on an untested foundation.
 
-## 2. Phase 1′ — verification retrofit
+## 2. Delivery scope and gates
+
+**Deliverable scope:** a verified, localhost-only, single-user M1 vertical slice: authentication,
+creation, bounded auth-log upload, deterministic extraction/detection, grounded evidence/findings,
+and an auditable generated report. This is the product that must be reliable.
+
+**Research scope:** only the smallest controlled extension required to test the grounding question:
+one model/provider path, one controlled baseline, and labelled scenarios. The graph, adaptive planner,
+multiple intelligence providers, routing failover, investigator chat, analyst study, broad endpoint or
+PCAP tooling, and a rich frontend are deferred unless a written experiment need demonstrates they are
+necessary.
+
+No phase starts merely because its predecessor is numbered complete: its exit criteria must be met and
+the supported deployment boundary must still hold. Feature development beyond M1 is blocked until
+Phase 1′ exits.
+
+## 3. Phase 1′ — verification retrofit
 
 The one phase with no new features. It exists because Phases 1–3 were implemented before any design
 documentation or tests, which §32 forbids, and the cheapest moment to correct that is now — before
@@ -54,21 +70,29 @@ more code depends on it.
    assumed.
 3. The grounding invariants G0–G4 each have a passing test proving `GroundingError` is *raised*.
 4. Append-only enforcement tested for `evidence` and `audit_log`.
-5. `ruff check` clean — 18 findings outstanding.
-6. `mypy src` clean — 11 findings outstanding, including one genuine annotation weakness
+5. Startup recovery marks interrupted work terminally, preserves its trace, and requires an explicit
+   retry; duplicate start attempts are rejected by a database-backed claim.
+6. Database/artifact size quotas, deterministic truncation markers, cursor pagination, and a
+   backup/restore integrity check are implemented and tested.
+7. A written raw-artifact retention state (`reproducible`, `derived-only`, or `minimal/audit-only`)
+   is recorded per investigation; reports disclose when source bytes no longer exist.
+8. `ruff check` clean — 18 findings outstanding.
+9. `mypy src` clean — 11 findings outstanding, including one genuine annotation weakness
    (`orchestrator.py:308` types an agent class as bare `type`; the rest are variable-shadowing
    inference complaints in `reporting.py`).
-7. Alembic introduced with a baseline revision, replacing `create_all()`.
-8. CI in GitHub Actions: ruff, ruff format, mypy, pytest, `pip-audit` — all gating.
-9. Pre-commit hooks including a secret scan.
-10. Stale phase references in `src/` docstrings corrected against this document.
-11. The status table in [README.md](../README.md) updated to reflect what tests now prove.
+10. Alembic introduced with a baseline revision, replacing `create_all()`.
+11. CI in GitHub Actions: ruff, ruff format, mypy, pytest, `pip-audit` — all gating.
+12. Pre-commit hooks including a secret scan.
+13. Stale phase references in `src/` docstrings corrected against this document.
+14. The status table in [README.md](../README.md) updated to reflect what tests now prove.
+15. The localhost/single-user operating boundary is tested as configuration and documented in the
+    capability output.
 
 **Estimate: 2–3 weeks with the full team.** Anything that ships before this completes inherits an
 unverified foundation, and the first place that surfaces is the evaluation, where a silent bug becomes
 a published number.
 
-## 3. Phases 4–10
+## 4. Phases 4–10
 
 ### Phase 4 — Tools, knowledge, and hardening
 

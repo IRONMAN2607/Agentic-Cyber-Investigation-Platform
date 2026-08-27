@@ -38,9 +38,7 @@ class AgentRegistry:
         return name in self._agents
 
     def by_capability(self, capability: AgentCapability) -> list[Agent]:
-        return [
-            agent for agent in self._agents.values() if type(agent).capability is capability
-        ]
+        return [agent for agent in self._agents.values() if type(agent).capability is capability]
 
     def names(self) -> list[str]:
         return sorted(self._agents)

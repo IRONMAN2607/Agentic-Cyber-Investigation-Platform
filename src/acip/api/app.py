@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from acip import __version__
 from acip.agents.registry import build_default_registry as build_agent_registry
@@ -81,6 +83,7 @@ def create_app(
         if run_bootstrap:
             await bootstrap(db, settings)
         app.state.services = build_services(settings, db)
+        await app.state.services.runner.recover_interrupted()
         logger.info(
             "application ready",
             extra={
@@ -119,6 +122,10 @@ def create_app(
     app.include_router(auth.router, prefix=prefix)
     app.include_router(investigations.router, prefix=prefix)
 
+    web_dir = Path("web")
+    if web_dir.exists() and (web_dir / "index.html").exists():
+        app.mount("/", StaticFiles(directory="web", html=True), name="web")
+
     _install_error_handlers(app, settings)
     return app
 
@@ -127,18 +134,14 @@ def _install_error_handlers(app: FastAPI, settings: Settings) -> None:
     @app.exception_handler(ACIPError)
     async def _acip_error(_request: Request, exc: ACIPError) -> JSONResponse:
         if exc.status_code >= 500:
-            logger.error(
-                "request failed", extra={"error_code": exc.code, "message": exc.message}
-            )
+            logger.error("request failed", extra={"error_code": exc.code, "message": exc.message})
         return JSONResponse(
             status_code=exc.status_code,
             content={"code": exc.code, "message": exc.message, "detail": exc.detail},
         )
 
     @app.exception_handler(RequestValidationError)
-    async def _validation_error(
-        _request: Request, exc: RequestValidationError
-    ) -> JSONResponse:
+    async def _validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content={
@@ -161,10 +164,17 @@ def _install_error_handlers(app: FastAPI, settings: Settings) -> None:
 
 
 def _serialisable_errors(exc: RequestValidationError) -> list[dict[str, object]]:
-    """Strip non-JSON values (e.g. uploaded bytes) out of validation errors."""
+    """Strip non-JSON values (e.g. uploaded bytes, exception objects in ctx) out of errors."""
     cleaned: list[dict[str, object]] = []
     for error in exc.errors():
-        entry = {key: value for key, value in error.items() if key != "input"}
+        entry: dict[str, object] = {}
+        for key, value in error.items():
+            if key == "input":
+                continue
+            if key == "ctx" and isinstance(value, dict):
+                entry[key] = {k: str(v) for k, v in value.items()}
+            else:
+                entry[key] = value
         entry["loc"] = [str(part) for part in error.get("loc", ())]
         cleaned.append(entry)
     return cleaned

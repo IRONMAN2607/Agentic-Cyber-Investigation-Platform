@@ -51,6 +51,18 @@ class ConflictError(ACIPError):
     code = "conflict"
 
 
+class RateLimitExceededError(ACIPError):
+    status_code = 429
+    code = "rate_limit_exceeded"
+
+    def __init__(self, retry_after: int, message: str | None = None) -> None:
+        super().__init__(
+            message or f"Rate limit exceeded. Try again in {retry_after} seconds.",
+            detail={"retry_after": retry_after},
+        )
+        self.retry_after = retry_after
+
+
 class PayloadTooLargeError(ACIPError):
     status_code = 413
     code = "payload_too_large"
@@ -77,6 +89,11 @@ class ToolError(ACIPError):
 class ToolUnavailableError(ToolError):
     status_code = 503
     code = "tool_unavailable"
+
+
+class ToolExecutionError(ToolError):
+    status_code = 500
+    code = "tool_execution_failed"
 
 
 class AgentError(ACIPError):

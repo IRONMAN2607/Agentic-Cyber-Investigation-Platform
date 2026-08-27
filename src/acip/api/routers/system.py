@@ -14,8 +14,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from acip import __version__
-from acip.api.deps import Services, get_services, get_session
+from acip.api.deps import Admin, Services, get_services, get_session
 from acip.api.schemas import (
+    AdminCapabilitiesResponse,
     AgentCapabilityInfo,
     CapabilitiesResponse,
     HealthResponse,
@@ -34,7 +35,7 @@ async def health(session: Annotated[AsyncSession, Depends(get_session)]) -> Heal
     database = "ok"
     try:
         await session.execute(sa.text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001 - reported, not raised
+    except Exception as exc:
         logger.error("database health check failed", extra={"error": str(exc)})
         database = "unavailable"
     return HealthResponse(
@@ -48,8 +49,23 @@ async def health(session: Annotated[AsyncSession, Depends(get_session)]) -> Heal
 async def capabilities(
     services: Annotated[Services, Depends(get_services)],
 ) -> CapabilitiesResponse:
-    """What is actually installed and runnable right now."""
+    """Coarse capability report for clients without disclosing internal diagnostics."""
     return CapabilitiesResponse(
+        environment=services.settings.environment,
+        tools=services.tools.names(),
+        agents=services.agents.names(),
+        planner=services.planner.name,
+        not_implemented=list(NOT_IMPLEMENTED),
+    )
+
+
+@router.get("/admin/capabilities", response_model=AdminCapabilitiesResponse)
+async def admin_capabilities(
+    _admin: Admin,
+    services: Annotated[Services, Depends(get_services)],
+) -> AdminCapabilitiesResponse:
+    """Detailed diagnostic capability report with live probe outputs for administrators."""
+    return AdminCapabilitiesResponse(
         environment=services.settings.environment,
         tools=[
             ToolCapability(

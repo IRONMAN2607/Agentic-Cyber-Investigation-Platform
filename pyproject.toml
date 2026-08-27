@@ -17,6 +17,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pyjwt>=2.9",
     "argon2-cffi>=23.1",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -51,7 +52,7 @@ select = ["E", "F", "I", "UP", "B", "S", "ASYNC", "RUF"]
 ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106", "S108"]
+"tests/**" = ["S105", "S106", "S108", "E501"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -105,9 +105,7 @@ def evaluate_auth_rules(
             continue
         hit = DetectionHit(
             rule_id=RULE_SUCCESS_AFTER_BRUTEFORCE,
-            title=(
-                f"Successful authentication from {source_ip} following failed attempts"
-            ),
+            title=(f"Successful authentication from {source_ip} following failed attempts"),
             description=(
                 f"User '{success.user}' authenticated successfully from {source_ip} after "
                 f"{len(burst)} failed attempts from the same address. This pattern is "
@@ -170,10 +168,15 @@ def _first_success_after(
     events: list[AuthEventView], source_ip: str, burst: list[AuthEventView]
 ) -> AuthEventView | None:
     """Earliest successful authentication from ``source_ip`` related to ``burst``."""
-    burst_start = min(event.observed_at for event in burst)  # type: ignore[type-var]
-    deadline = max(event.observed_at for event in burst) + dt.timedelta(  # type: ignore[type-var,operator]
-        seconds=_SUCCESS_CORRELATION_SECONDS
+    burst_events_with_time = [e for e in burst if e.observed_at is not None]
+    if not burst_events_with_time:
+        return None
+    burst_start = min(
+        event.observed_at for event in burst_events_with_time if event.observed_at is not None
     )
+    deadline = max(
+        event.observed_at for event in burst_events_with_time if event.observed_at is not None
+    ) + dt.timedelta(seconds=_SUCCESS_CORRELATION_SECONDS)
     candidates = [
         event
         for event in events
@@ -182,7 +185,12 @@ def _first_success_after(
         and event.observed_at is not None
         and burst_start <= event.observed_at <= deadline
     ]
-    return min(candidates, key=lambda event: event.observed_at) if candidates else None  # type: ignore[arg-type,return-value]
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda event: event.observed_at or dt.datetime.max.replace(tzinfo=dt.UTC),
+    )
 
 
 def _evaluate_user_enumeration(events: list[AuthEventView]) -> list[DetectionHit]:
@@ -213,7 +221,9 @@ def _evaluate_user_enumeration(events: list[AuthEventView]) -> list[DetectionHit
                     "produces this pattern; so does a misconfigured client, though rarely "
                     "across this many distinct names."
                 ),
-                evidence_ids=[event.evidence_id for event in list(users.values())[:_MAX_CITED_EVENTS]],
+                evidence_ids=[
+                    event.evidence_id for event in list(users.values())[:_MAX_CITED_EVENTS]
+                ],
             )
         )
     return hits

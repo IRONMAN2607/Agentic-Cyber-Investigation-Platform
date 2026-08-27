@@ -1,17 +1,17 @@
 """Investigation orchestration.
 
-Executes a plan task by task, recording an ``agent_runs`` row for every attempt.
+Executes a plan task by task, recording an ``agent_runs`` and ``task_runs`` row for every attempt.
 
 Transaction shape
 -----------------
 Each task spans three short transactions:
 
-1. Insert the ``AgentRun`` as ``running`` and commit. The attempt is now durable,
-   so a crash mid-task leaves visible evidence that it was tried.
+1. Insert the ``AgentRun`` and update ``TaskRun`` as ``running`` and commit.
+   The attempt is now durable, so a crash mid-task leaves visible evidence that it was tried.
 2. Run the agent. Committed on success; rolled back on failure, which discards
    the partial evidence and tool rows written by the failing task. Partial output
    from a failed tool must not become citable evidence.
-3. Update the ``AgentRun`` with its outcome and commit.
+3. Update the ``AgentRun`` and ``TaskRun`` with their outcome and commit.
 
 Failure policy
 --------------
@@ -31,19 +31,19 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from acip.agents.base import AgentContext, AgentResult
+from acip.agents.base import Agent, AgentContext, AgentResult
 from acip.agents.registry import AgentRegistry
 from acip.config import Settings
 from acip.core import audit
 from acip.core.evidence.store import EvidenceStore
 from acip.core.orchestration.planner import Plan, Planner, Task
-from acip.db.models import AgentRun, Artifact, Investigation
+from acip.db.models import AgentRun, Artifact, Investigation, TaskRun
 from acip.db.session import Database
 from acip.errors import NotFoundError
 from acip.logging import get_logger, log_context
 from acip.tools.registry import ToolRegistry
 from acip.tools.runner import ToolRunner
-from acip.types import InvestigationStatus, RunStatus
+from acip.types import InvestigationStatus, RunStatus, TaskStatus
 
 logger = get_logger(__name__)
 
@@ -90,9 +90,7 @@ class Orchestrator:
         """Run the full investigation. Never raises for task-level failures."""
         with log_context(investigation_id=str(investigation_id)):
             plan = await self._begin(investigation_id)
-            deadline = (
-                asyncio.get_running_loop().time() + self._settings.max_investigation_seconds
-            )
+            deadline = asyncio.get_running_loop().time() + self._settings.max_investigation_seconds
 
             outcomes: list[TaskOutcome] = []
             halted_reason: str | None = None
@@ -152,6 +150,18 @@ class Orchestrator:
                         "task(s) by the configured per-investigation limit.",
                     ),
                 )
+
+            # Persist planned tasks in task_runs table
+            for task in plan.tasks:
+                task_row = TaskRun(
+                    investigation_id=investigation_id,
+                    task_id=task.task_id,
+                    task_type=task.agent_name,
+                    status=TaskStatus.PENDING.value,
+                    rationale=task.rationale,
+                    inputs=dict(task.inputs),
+                )
+                session.add(task_row)
 
             investigation.status = InvestigationStatus.RUNNING.value
             investigation.started_at = dt.datetime.now(dt.UTC)
@@ -247,13 +257,15 @@ class Orchestrator:
                 result = await asyncio.wait_for(agent.run(ctx, dict(task.inputs)), timeout=budget)
         except TimeoutError:
             error = f"agent exceeded its remaining time budget of {budget:.0f}s"
-        except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
+        except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
             logger.exception("agent failed", extra={"agent": task.agent_name})
 
         finished = dt.datetime.now(dt.UTC)
         status = result.status if result is not None else RunStatus.FAILED
         await self._close_run(
+            investigation_id,
+            task,
             agent_run_id,
             status=status,
             result=result,
@@ -268,9 +280,7 @@ class Orchestrator:
             error=error,
         )
 
-    async def _skip(
-        self, investigation_id: uuid.UUID, task: Task, reason: str
-    ) -> TaskOutcome:
+    async def _skip(self, investigation_id: uuid.UUID, task: Task, reason: str) -> TaskOutcome:
         agent_cls = type(self._agents.get(task.agent_name))
         async with self._db.session() as session:
             run = AgentRun(
@@ -287,6 +297,19 @@ class Orchestrator:
                 error=reason,
             )
             session.add(run)
+
+            task_row = await session.scalar(
+                sa.select(TaskRun).where(
+                    TaskRun.investigation_id == investigation_id,
+                    TaskRun.task_id == task.task_id,
+                )
+            )
+            if task_row is not None:
+                task_row.status = TaskStatus.CANCELLED.value
+                task_row.finished_at = dt.datetime.now(dt.UTC)
+                task_row.error = reason
+                task_row.outputs = {"skipped_because": reason}
+
             await session.flush()
             run_id = run.id
         logger.warning("task skipped", extra={"agent": task.agent_name, "reason": reason})
@@ -299,7 +322,7 @@ class Orchestrator:
         )
 
     async def _open_run(
-        self, investigation_id: uuid.UUID, task: Task, agent_cls: type
+        self, investigation_id: uuid.UUID, task: Task, agent_cls: type[Agent]
     ) -> uuid.UUID:
         async with self._db.session() as session:
             run = AgentRun(
@@ -312,11 +335,35 @@ class Orchestrator:
                 inputs=dict(task.inputs),
             )
             session.add(run)
+
+            task_row = await session.scalar(
+                sa.select(TaskRun).where(
+                    TaskRun.investigation_id == investigation_id,
+                    TaskRun.task_id == task.task_id,
+                )
+            )
+            if task_row is None:
+                task_row = TaskRun(
+                    investigation_id=investigation_id,
+                    task_id=task.task_id,
+                    task_type=agent_cls.name,
+                    status=TaskStatus.RUNNING.value,
+                    rationale=task.rationale,
+                    inputs=dict(task.inputs),
+                    started_at=dt.datetime.now(dt.UTC),
+                )
+                session.add(task_row)
+            else:
+                task_row.status = TaskStatus.RUNNING.value
+                task_row.started_at = dt.datetime.now(dt.UTC)
+
             await session.flush()
             return run.id
 
     async def _close_run(
         self,
+        investigation_id: uuid.UUID,
+        task: Task,
         agent_run_id: uuid.UUID,
         *,
         status: RunStatus,
@@ -338,13 +385,29 @@ class Orchestrator:
         )
         async with self._db.session() as session:
             run = await session.get(AgentRun, agent_run_id)
-            if run is None:  # pragma: no cover - the row was just committed
-                raise NotFoundError(f"agent run {agent_run_id} disappeared")
-            run.status = status.value
-            run.finished_at = dt.datetime.now(dt.UTC)
-            run.duration_ms = duration_ms
-            run.outputs = outputs
-            run.error = error
+            if run is not None:
+                run.status = status.value
+                run.finished_at = dt.datetime.now(dt.UTC)
+                run.duration_ms = duration_ms
+                run.outputs = outputs
+                run.error = error
+
+            task_row = await session.scalar(
+                sa.select(TaskRun).where(
+                    TaskRun.investigation_id == investigation_id,
+                    TaskRun.task_id == task.task_id,
+                )
+            )
+            if task_row is not None:
+                task_row.status = (
+                    TaskStatus.SUCCEEDED.value
+                    if status is RunStatus.SUCCEEDED
+                    else TaskStatus.FAILED.value
+                )
+                task_row.finished_at = dt.datetime.now(dt.UTC)
+                task_row.duration_ms = duration_ms
+                task_row.outputs = outputs
+                task_row.error = error
 
 
 def _derive_status(outcomes: list[TaskOutcome], halted: bool) -> InvestigationStatus:
@@ -365,18 +428,14 @@ def _derive_status(outcomes: list[TaskOutcome], halted: bool) -> InvestigationSt
     return InvestigationStatus.COMPLETED
 
 
-async def _load_investigation(
-    session: AsyncSession, investigation_id: uuid.UUID
-) -> Investigation:
+async def _load_investigation(session: AsyncSession, investigation_id: uuid.UUID) -> Investigation:
     investigation = await session.get(Investigation, investigation_id)
     if investigation is None:
         raise NotFoundError(f"investigation {investigation_id} not found")
     return investigation
 
 
-async def _load_artifacts(
-    session: AsyncSession, investigation_id: uuid.UUID
-) -> list[Artifact]:
+async def _load_artifacts(session: AsyncSession, investigation_id: uuid.UUID) -> list[Artifact]:
     rows = await session.scalars(
         sa.select(Artifact)
         .where(Artifact.investigation_id == investigation_id)

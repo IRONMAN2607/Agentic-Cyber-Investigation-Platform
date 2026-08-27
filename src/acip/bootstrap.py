@@ -53,8 +53,7 @@ async def seed_admin(database: Database, settings: Settings) -> User | None:
         session.add(user)
         await session.flush()
         logger.warning(
-            "seeded development administrator; change this password before any "
-            "non-local use",
+            "seeded development administrator; change this password before any non-local use",
             extra={"username": username},
         )
         return user

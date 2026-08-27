@@ -12,6 +12,7 @@ from acip.api.deps import CurrentUser, Services, get_services, get_session
 from acip.api.schemas import LoginRequest, TokenResponse, UserResponse
 from acip.core import audit
 from acip.core.security.passwords import hash_password, verify_password
+from acip.core.security.ratelimit import login_limiter, rate_limit
 from acip.core.security.tokens import create_access_token
 from acip.db.models import User
 from acip.errors import AuthenticationError
@@ -26,7 +27,11 @@ router = APIRouter(tags=["auth"])
 _DUMMY_HASH = hash_password("timing-equalisation-placeholder")
 
 
-@router.post("/auth/login", response_model=TokenResponse)
+@router.post(
+    "/auth/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(rate_limit(login_limiter))],
+)
 async def login(
     payload: LoginRequest,
     services: Annotated[Services, Depends(get_services)],

@@ -14,7 +14,7 @@ G0  Every cited evidence id must exist and belong to the same investigation.
 G1  ``FACT`` requires at least one cited evidence row with ``tool_run_id`` set.
 G2  ``INFERENCE`` requires at least one cited evidence row and stated reasoning.
 G3  ``HYPOTHESIS`` requires stated reasoning describing what would confirm or
-    refute it.
+    refute it (enforced via refutation_condition).
 G4  ``UNKNOWN`` must not claim a severity above ``INFO``.
 
 A violation raises :class:`~acip.errors.GroundingError`. That is deliberate:
@@ -29,11 +29,25 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from acip.core.evidence.contracts import EvidenceDraft, FindingDraft
-from acip.db.models import Evidence, Finding
+from acip.core.evidence.contracts import (
+    EvidenceDraft,
+    FindingDraft,
+    HypothesisDraft,
+    HypothesisGapDraft,
+    ModelExecutionDraft,
+)
+from acip.db.models import (
+    Evidence,
+    Finding,
+    FindingEvidence,
+    Hypothesis,
+    HypothesisEvidence,
+    HypothesisGap,
+    ModelExecution,
+)
 from acip.errors import GroundingError
 from acip.logging import get_logger
-from acip.types import AssertionClass, Severity
+from acip.types import AssertionClass, EvidenceRole, Severity
 
 logger = get_logger(__name__)
 
@@ -109,7 +123,7 @@ class EvidenceStore:
             "evidence recorded",
             extra={
                 "source_tool": source_tool,
-                "created": len(created),
+                "created_count": len(created),
                 "duplicates_skipped": len(drafts) - len(created),
             },
         )
@@ -119,7 +133,7 @@ class EvidenceStore:
         self, draft: FindingDraft, *, agent_run_id: uuid.UUID | None = None
     ) -> Finding:
         """Validate a claim against the grounding invariants and persist it."""
-        cited = await self._load_cited_evidence(draft)
+        cited = await self._load_cited_evidence(draft.evidence_ids)
         self._enforce_grounding(draft, cited)
 
         row = Finding(
@@ -136,6 +150,17 @@ class EvidenceStore:
         )
         self._session.add(row)
         await self._session.flush()
+
+        # Link finding citations in relational join table
+        for evidence_id in draft.evidence_ids:
+            fe = FindingEvidence(
+                finding_id=row.id,
+                evidence_id=evidence_id,
+                role=EvidenceRole.SUPPORTS.value,
+            )
+            self._session.add(fe)
+        await self._session.flush()
+
         logger.info(
             "finding recorded",
             extra={
@@ -147,9 +172,110 @@ class EvidenceStore:
         )
         return row
 
-    async def _load_cited_evidence(self, draft: FindingDraft) -> list[Evidence]:
+    async def add_hypothesis(
+        self, draft: HypothesisDraft, *, agent_run_id: uuid.UUID | None = None
+    ) -> Hypothesis:
+        """Validate a hypothesis and persist it with supporting/contradicting links."""
+        # Enforce G3: refutation condition must be non-empty
+        if not (draft.refutation_condition or "").strip():
+            raise GroundingError(
+                "a HYPOTHESIS must state a refutation condition (Invariant G3)",
+                detail={"invariant": "G3", "statement": draft.statement},
+            )
+
+        # Validate cited evidence exists
+        all_cited = list(draft.supporting_evidence_ids) + list(draft.contradicting_evidence_ids)
+        if all_cited:
+            await self._load_cited_evidence(all_cited)
+
+        row = Hypothesis(
+            investigation_id=self._investigation_id,
+            statement=draft.statement,
+            confidence=draft.confidence,
+            refutation_condition=draft.refutation_condition,
+            agent_run_id=agent_run_id,
+        )
+        self._session.add(row)
+        await self._session.flush()
+
+        # Record relational links
+        for eid in draft.supporting_evidence_ids:
+            self._session.add(
+                HypothesisEvidence(
+                    hypothesis_id=row.id,
+                    evidence_id=eid,
+                    role=EvidenceRole.SUPPORTS.value,
+                )
+            )
+        for eid in draft.contradicting_evidence_ids:
+            self._session.add(
+                HypothesisEvidence(
+                    hypothesis_id=row.id,
+                    evidence_id=eid,
+                    role=EvidenceRole.CONTRADICTS.value,
+                )
+            )
+        await self._session.flush()
+
+        logger.info(
+            "hypothesis recorded",
+            extra={
+                "hypothesis": row.display_id,
+                "confidence": row.confidence,
+            },
+        )
+        return row
+
+    async def add_hypothesis_gap(
+        self, hypothesis_id: uuid.UUID, draft: HypothesisGapDraft
+    ) -> HypothesisGap:
+        """Record an explicit knowledge gap preventing hypothesis resolution."""
+        gap = HypothesisGap(
+            hypothesis_id=hypothesis_id,
+            description=draft.description,
+            required_tool=draft.required_tool,
+        )
+        self._session.add(gap)
+        await self._session.flush()
+        return gap
+
+    async def record_model_execution(
+        self,
+        draft: ModelExecutionDraft,
+        *,
+        agent_run_id: uuid.UUID | None = None,
+        task_id: str | None = None,
+    ) -> ModelExecution:
+        """Record an immutable LLM execution trace."""
+        call = ModelExecution(
+            investigation_id=self._investigation_id,
+            agent_run_id=agent_run_id,
+            task_id=task_id,
+            task_class=draft.task_class,
+            provider=draft.provider,
+            model=draft.model,
+            prompt_name=draft.prompt_name,
+            prompt_version=draft.prompt_version,
+            tokens_in=draft.tokens_in,
+            tokens_out=draft.tokens_out,
+            latency_ms=draft.latency_ms,
+            cost_estimate_usd=draft.cost_estimate_usd,
+            finish_reason=draft.finish_reason.value,
+            retries=draft.retries,
+            schema_valid=draft.schema_valid,
+            fallback_from=draft.fallback_from,
+            temperature=draft.temperature,
+            seed=draft.seed,
+            nondeterminism_risk=draft.nondeterminism_risk,
+            grounding_violations=draft.grounding_violations,
+        )
+        self._session.add(call)
+        await self._session.flush()
+        return call
+
+    async def _load_cited_evidence(self, evidence_ids: list[uuid.UUID]) -> list[Evidence]:
         """Fetch cited evidence, enforcing G0."""
-        if not draft.evidence_ids:
+        if not evidence_ids:
             return []
 
         rows = list(
@@ -157,17 +283,17 @@ class EvidenceStore:
                 await self._session.scalars(
                     sa.select(Evidence).where(
                         Evidence.investigation_id == self._investigation_id,
-                        Evidence.id.in_(draft.evidence_ids),
+                        Evidence.id.in_(evidence_ids),
                     )
                 )
             ).all()
         )
         found = {row.id for row in rows}
-        missing = [str(eid) for eid in draft.evidence_ids if eid not in found]
+        missing = [str(eid) for eid in evidence_ids if eid not in found]
         if missing:
             raise GroundingError(
                 "finding cites evidence that does not exist in this investigation",
-                detail={"finding": draft.title, "missing_evidence_ids": missing},
+                detail={"missing_evidence_ids": missing},
             )
         return rows
 
@@ -239,6 +365,17 @@ class EvidenceStore:
                     sa.select(Finding)
                     .where(Finding.investigation_id == self._investigation_id)
                     .order_by(Finding.created_at)
+                )
+            ).all()
+        )
+
+    async def list_hypotheses(self) -> list[Hypothesis]:
+        return list(
+            (
+                await self._session.scalars(
+                    sa.select(Hypothesis)
+                    .where(Hypothesis.investigation_id == self._investigation_id)
+                    .order_by(Hypothesis.created_at)
                 )
             ).all()
         )

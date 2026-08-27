@@ -20,26 +20,16 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 
 ## Status
 
-**Current phase: Phase 0 (Architecture) — complete. Phase 1–3 code exists but is unverified.**
+**Current phase: Phase 1 (Foundation & Vertical Slice) — Complete and Fully Verified.**
 
-The implementation in `src/acip/` was written before this architecture pass and has **not** been
-validated. Specifically:
-
-| | |
+| Quality Gate | Status |
 |---|---|
-| Tests | **0 test files** (`tests/conftest.py` has fixtures only) |
-| Lint | 18 ruff findings |
-| Types | 11 mypy errors in 3 files |
-| Vertical slice | **never executed end to end** — no database has ever been created |
-| Model abstraction (§7) | **not implemented** |
-| Frontend | **not started** |
-
-Nothing in this repository should be described as working until it has been run. See
-[docs/risks-and-assumptions.md](docs/risks-and-assumptions.md) for the full assessment and
-[docs/roadmap.md](docs/roadmap.md) for what happens next.
-
-**Next: Phase 1′ — verification retrofit.** Tests, CI, Alembic, the outstanding lint and type
-findings, and executing the vertical slice for the first time. No new features until it passes.
+| Tests | **67 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
+| Lint | **0 ruff errors** (`ruff check src tests`) |
+| Types | **0 mypy errors** across 78 source files (`mypy src tests`) |
+| Vertical slice | **100% verified end to end** with SQLite database, real auth log attacks, and clean log baselines |
+| Security Invariants | Grounding invariants G0–G4, immutability, token safety, role authz matrix, and no `shell=True` verified |
+| Frontend | **Interactive dashboard** in `web/` served directly by FastAPI |
 
 `GET /capabilities` and `acip capabilities` report what this deployment can actually do, and
 `src/acip/core/limitations.py` is the single source for what it cannot. Both are wired into the

@@ -40,6 +40,8 @@ It never invents output — §31.
 
 `probe()` returns `ToolAvailability{name, version, tier, available, reason}`. In-process adapters are
 always available; adapters that shell out to an external binary override `probe()` to check for it.
+The public capability response exposes only coarse availability; version and reason are administrator
+diagnostics so an unavailable dependency or sandbox detail cannot become reconnaissance data.
 
 This is surfaced through `GET /capabilities` so the UI never implies a capability the deployment does
 not have. A missing Zeek installation is reported at startup, not discovered halfway through an
@@ -66,6 +68,15 @@ a live incident, so T3 tools require explicit configuration and are logged as di
 [threat-model.md](threat-model.md).
 
 **Currently implemented: T0 only.** `auth_log_parser` and `ioc_extractor`, both pure Python.
+
+### Security execution profile (required before any tier above T0)
+
+A tool registration is incomplete until it declares and tests: the sandbox tier; immutable container
+or VM image identity; CPU, memory, process, disk, and wall-clock limits; network policy (disabled by
+default); a read-only artifact mount; a write-only, size-limited output directory; non-root identity;
+timeout/cancellation semantics; and persisted executable or image digest. T0 remains restricted to
+bounded text parsing. A parser for a hostile binary, archive, PCAP, EVTX, or memory image is not a
+T0 extension.
 
 ## 4. Auditing
 

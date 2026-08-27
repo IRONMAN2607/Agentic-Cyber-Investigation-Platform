@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACIP — Agentic Cyber Investigation Platform</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="logo-group">
+      <span class="logo-badge">ACIP</span>
+      <span class="logo-title">Cyber Investigation Platform</span>
+    </div>
+    <div class="nav-actions">
+      <span id="health-badge" class="badge badge-completed">System: OK</span>
+      <span id="user-display" class="user-badge">Not Logged In</span>
+      <button id="btn-login-modal" class="btn btn-outline btn-sm">Login</button>
+      <button id="btn-logout" class="btn btn-outline btn-sm" style="display: none;">Logout</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Sidebar: Investigations List -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Investigations</span>
+        <button id="btn-new-inv" class="btn btn-primary btn-sm">+ New</button>
+      </div>
+      <ul id="inv-list" class="inv-list">
+        <li style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+          Loading investigations...
+        </li>
+      </ul>
+    </aside>
+
+    <!-- Right: Active Investigation Workspace -->
+    <section id="workspace-view" class="workspace">
+      <div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">
+        Select an investigation from the sidebar or click <strong>+ New</strong> to start.
+      </div>
+    </section>
+  </main>
+
+  <!-- Native HTML Dialog: Login -->
+  <dialog id="modal-login">
+    <div class="dialog-header">
+      <h3 class="dialog-title">Platform Login</h3>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('modal-login').close()">✕</button>
+    </div>
+    <form id="form-login">
+      <div class="form-group">
+        <label for="login-username">Username</label>
+        <input type="text" id="login-username" class="form-control" autocomplete="username" required value="admin">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" class="form-control" autocomplete="current-password" required value="admin-password-123">
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-login').close()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Sign In</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Native HTML Dialog: New Investigation -->
+  <dialog id="modal-new-inv">
+    <div class="dialog-header">
+      <h3 class="dialog-title">New Investigation</h3>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('modal-new-inv').close()">✕</button>
+    </div>
+    <form id="form-new-inv">
+      <div class="form-group">
+        <label for="inv-title">Investigation Title</label>
+        <input type="text" id="inv-title" class="form-control" placeholder="e.g. Web01 Suspicious SSH Activity" required>
+      </div>
+      <div class="form-group">
+        <label for="inv-target-type">Target Type</label>
+        <select id="inv-target-type" class="form-control">
+          <option value="log">Log File</option>
+          <option value="ip">IP Address</option>
+          <option value="host">Host</option>
+          <option value="description">Incident Description</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="inv-target-value">Target Value / Identifier</label>
+        <input type="text" id="inv-target-value" class="form-control" placeholder="e.g. auth.log or 203.0.113.55" required>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-new-inv').close()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Investigation</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Native HTML Dialog: Upload Artifact -->
+  <dialog id="modal-upload-artifact">
+    <div class="dialog-header">
+      <h3 class="dialog-title">Upload Artifact</h3>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('modal-upload-artifact').close()">✕</button>
+    </div>
+    <form id="form-upload-artifact">
+      <input type="hidden" id="upload-inv-id">
+      <div class="form-group">
+        <label for="upload-file">Artifact File</label>
+        <input type="file" id="upload-file" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label for="upload-kind">Declared Kind</label>
+        <select id="upload-kind" class="form-control">
+          <option value="linux_auth_log">Linux Auth Log (syslog/sshd)</option>
+          <option value="json">JSON Records</option>
+          <option value="unknown">Generic / Unknown</option>
+        </select>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-upload-artifact').close()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Upload & Quarantine</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

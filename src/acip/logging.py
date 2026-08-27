@@ -16,8 +16,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-_log_context: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "acip_log_context", default={}
+_log_context: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "acip_log_context", default=None
 )
 
 # Attributes present on every LogRecord; anything else was added by the caller
@@ -31,13 +31,15 @@ _RESERVED = frozenset(
 
 def bind_context(**values: Any) -> None:
     """Add values to the ambient logging context for the current task."""
-    _log_context.set({**_log_context.get(), **values})
+    current = _log_context.get() or {}
+    _log_context.set({**current, **values})
 
 
 @contextmanager
 def log_context(**values: Any) -> Iterator[None]:
     """Temporarily bind values to the logging context."""
-    token = _log_context.set({**_log_context.get(), **values})
+    current = _log_context.get() or {}
+    token = _log_context.set({**current, **values})
     try:
         yield
     finally:
@@ -48,7 +50,8 @@ class ContextFilter(logging.Filter):
     """Merge the ambient context into each record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        for key, value in _log_context.get().items():
+        current = _log_context.get() or {}
+        for key, value in current.items():
             if not hasattr(record, key):
                 setattr(record, key, value)
         return True
@@ -100,9 +103,7 @@ def _coerce(value: Any) -> Any:
 
 def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
     """Install the root handler. Idempotent, so it is safe to call in tests."""
-    formatter: logging.Formatter = (
-        JSONFormatter() if fmt == "json" else ConsoleFormatter()
-    )
+    formatter: logging.Formatter = JSONFormatter() if fmt == "json" else ConsoleFormatter()
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
     handler.addFilter(ContextFilter())

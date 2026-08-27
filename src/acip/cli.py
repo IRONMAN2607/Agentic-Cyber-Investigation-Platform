@@ -78,9 +78,7 @@ async def _init(settings: Settings) -> None:
         await database.dispose()
 
 
-async def _create_user(
-    settings: Settings, username: str, role: str, email: str | None
-) -> int:
+async def _create_user(settings: Settings, username: str, role: str, email: str | None) -> int:
     password = getpass.getpass("Password: ")
     if len(password) < MIN_PASSWORD_LENGTH:
         print(

@@ -25,7 +25,7 @@ Ranked by how much depends on them. "Confirm by" refers to the schedule in [road
 | **A9** | PostgreSQL is available in the deployment/lab environment by Phase 5 | The graph stays on SQLite: no JSONB, no `ARRAY` cycle guard in recursive CTEs, no grant-level append-only | Semester 1, week 12 |
 | **A10** | Data processed is synthetic or sanitised — no real personal or client data | Retention, redaction, and erasure obligations become binding immediately, and the append-only audit log conflicts with them | **Ongoing — this is a standing rule, not a one-off check** |
 | **A11** | The target venue accepts a system-plus-evaluation paper at capstone scope | Framing and depth are wrong late, when they are expensive to change | Week 4, with the supervisor |
-| **A12** | Deployment stays single-team | Missing object-level authorization becomes an active vulnerability rather than a stated limitation | Before any second team gains access |
+| **A12** | Deployment remains one trusted developer on localhost with synthetic/sanitised data only | Missing object-level authorization, rate limiting, and artifact-at-rest protections become active vulnerabilities | Before any second user, lab, network binding, or non-sanitised data |
 | **A13** | Python 3.12+ on all machines | `StrEnum`, `match`, and `datetime.UTC` usage breaks | Week 1 |
 | **A14** | A git remote with CI minutes is available | The Phase 1′ CI gate cannot be enforced, and verification depends on individual discipline | Week 1 |
 

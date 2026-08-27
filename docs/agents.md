@@ -79,6 +79,13 @@ queryable after the fact — it is the research dataset ([experiments.md](experi
    rows from the failing task. Partial output from a failed tool must not become citable evidence.
 3. Update the `AgentRun` with its outcome and commit.
 
+**Restart recovery.** This durable trace is not durable execution. On API startup, Phase 1′ recovery
+marks unfinished `queued`/`running` investigations and agent runs as `interrupted`, writes an audit
+reason, and never silently resumes or overwrites them. An explicit retry creates a new attempt. The
+single supported runner holds a database-backed claim before scheduling, preventing a second process
+from starting the same investigation; multiple workers remain unsupported until an external queue
+owns leases and heartbeats.
+
 **Failure policy.** A failing task does not abort the investigation. Later tasks still run, and the
 report records what failed — "step three crashed" is itself a finding a reader needs. Terminal
 status is derived from the outcome set:

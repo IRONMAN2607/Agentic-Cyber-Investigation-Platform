@@ -9,6 +9,8 @@ from __future__ import annotations
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
+from acip.errors import ValidationError
+
 # Defaults from argon2-cffi (Argon2id, 64 MiB, t=3, p=4) are appropriate for a
 # server-side interactive login; pinned here so a library change is a visible diff.
 _hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
@@ -17,6 +19,11 @@ MIN_PASSWORD_LENGTH = 12
 
 
 def hash_password(password: str) -> str:
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValidationError(
+            f"password must be at least {MIN_PASSWORD_LENGTH} characters long",
+            detail={"min_length": MIN_PASSWORD_LENGTH},
+        )
     return _hasher.hash(password)
 
 
