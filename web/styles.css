@@ -39,6 +39,11 @@
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 1) 80%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
   color: var(--text-primary);
   line-height: 1.5;
   min-height: 100vh;
@@ -47,7 +52,8 @@ body {
 }
 
 header {
-  background-color: var(--bg-secondary);
+  background-color: rgba(30, 41, 59, 0.85);
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-color);
   padding: 0.75rem 1.5rem;
   display: flex;
@@ -56,6 +62,7 @@ header {
   position: sticky;
   top: 0;
   z-index: 10;
+  transition: border-color 0.2s ease;
 }
 
 .logo-group {
@@ -72,6 +79,12 @@ header {
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   letter-spacing: 0.05em;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+.logo-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.6);
 }
 
 .logo-title {
@@ -93,6 +106,7 @@ header {
   padding: 0.25rem 0.65rem;
   border-radius: 9999px;
   border: 1px solid var(--border-color);
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 .btn {
@@ -105,8 +119,18 @@ header {
   border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.15s ease,
+              border-color 0.15s ease,
+              color 0.15s ease;
   text-decoration: none;
+}
+.btn:hover {
+  transform: translateY(-1px);
+}
+.btn:active {
+  transform: translateY(1px);
 }
 
 .btn-primary {
@@ -115,6 +139,7 @@ header {
 }
 .btn-primary:hover {
   background-color: var(--brand-hover);
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
 }
 
 .btn-secondary {
@@ -124,6 +149,7 @@ header {
 }
 .btn-secondary:hover {
   background-color: var(--bg-hover);
+  border-color: rgba(148, 163, 184, 0.3);
 }
 
 .btn-outline {
@@ -134,6 +160,7 @@ header {
 .btn-outline:hover {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
+  border-color: var(--text-secondary);
 }
 
 .btn-sm {
@@ -189,14 +216,20 @@ main {
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border-color);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.2s ease,
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
 }
 .inv-item:hover {
   background-color: var(--bg-hover);
+  transform: translateX(4px);
 }
 .inv-item.active {
-  background-color: var(--bg-hover);
+  background-color: rgba(30, 41, 59, 0.95);
   border-left: 3px solid var(--brand-primary);
+  box-shadow: inset 3px 0 10px rgba(56, 189, 248, 0.2);
+  transform: translateX(4px);
 }
 
 .inv-item-title {
@@ -228,14 +261,26 @@ main {
   scrollbar-width: thin;
 }
 
+@keyframes cardGlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Ensure flex children NEVER get squished/snipped by flexbox */
 .workspace > * {
   flex-shrink: 0;
   width: 100%;
+  animation: cardGlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hero-banner {
-  background: linear-gradient(to right, rgba(56, 189, 248, 0.07), rgba(129, 140, 248, 0.07));
+  background: linear-gradient(to right, rgba(56, 189, 248, 0.08), rgba(129, 140, 248, 0.08));
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1.25rem 1.5rem;
@@ -244,6 +289,7 @@ main {
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
+  animation-delay: 0.03s;
 }
 
 .hero-info h2 {
@@ -260,6 +306,64 @@ main {
   color: var(--text-secondary);
 }
 
+/* Live Progress Bar for Investigations */
+.progress-container {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.08);
+  animation: cardGlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--brand-primary);
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+
+.pulse-indicator {
+  width: 8px;
+  height: 8px;
+  background-color: var(--brand-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--brand-primary);
+  animation: pulseDot 1.4s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 14px var(--brand-primary); }
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(51, 65, 85, 0.6);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #38bdf8 100%);
+  background-size: 200% 100%;
+  animation: progressShimmer 1.8s infinite linear;
+}
+
+@keyframes progressShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -269,10 +373,29 @@ main {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  transition: all 0.2s ease;
 }
 
 .badge-completed { background-color: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-running { background-color: rgba(14, 165, 233, 0.18); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
+.badge-running {
+  background-color: rgba(14, 165, 233, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.45);
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
+  animation: pulseRunning 2s infinite ease-in-out;
+}
+
+@keyframes pulseRunning {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(14, 165, 233, 0.25);
+    border-color: rgba(14, 165, 233, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.65);
+    border-color: rgba(56, 189, 248, 0.85);
+  }
+}
+
 .badge-created { background-color: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
 .badge-failed { background-color: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
 .badge-partial { background-color: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
@@ -295,6 +418,7 @@ main {
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.75rem;
   overflow-x: auto;
+  animation-delay: 0.06s;
 }
 
 .nav-tab {
@@ -306,12 +430,13 @@ main {
   font-size: 0.825rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   white-space: nowrap;
 }
 .nav-tab:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+  transform: translateY(-1px);
 }
 .nav-tab.active {
   background: var(--brand-glow);
@@ -324,6 +449,7 @@ main {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1rem;
+  animation-delay: 0.09s;
 }
 
 .metric-card {
@@ -332,6 +458,14 @@ main {
   border-radius: 8px;
   padding: 1.1rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 10px 22px -5px rgba(0, 0, 0, 0.3), 0 0 12px rgba(56, 189, 248, 0.1);
 }
 
 .metric-label {
@@ -408,13 +542,28 @@ main {
 .finding-card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
+  border-left: 4px solid var(--border-color);
   border-radius: 8px;
   padding: 1.15rem;
-  transition: border-color 0.15s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
 }
 .finding-card:hover {
+  transform: translateY(-2px);
   border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.35);
 }
+
+.finding-card[data-severity="critical"] { border-left-color: var(--sev-critical); }
+.finding-card[data-severity="critical"]:hover { box-shadow: 0 8px 20px -4px rgba(239, 68, 68, 0.25); }
+.finding-card[data-severity="high"] { border-left-color: var(--sev-high); }
+.finding-card[data-severity="high"]:hover { box-shadow: 0 8px 20px -4px rgba(249, 115, 22, 0.25); }
+.finding-card[data-severity="medium"] { border-left-color: var(--sev-medium); }
+.finding-card[data-severity="medium"]:hover { box-shadow: 0 8px 20px -4px rgba(234, 179, 8, 0.25); }
+.finding-card[data-severity="low"] { border-left-color: var(--sev-low); }
+.finding-card[data-severity="low"]:hover { box-shadow: 0 8px 20px -4px rgba(59, 130, 246, 0.25); }
+.finding-card[data-severity="info"] { border-left-color: var(--sev-info); }
 
 .finding-header {
   display: flex;
@@ -465,6 +614,13 @@ main {
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 0.75rem;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.chip:hover {
+  transform: translateY(-1px) scale(1.03);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background-color: rgba(56, 189, 248, 0.08);
 }
 
 /* Report Formatted View */
@@ -513,22 +669,66 @@ main {
   border: 1px solid rgba(56, 189, 248, 0.2);
 }
 
-/* Native Dialog Styling */
+/* Modern Native Dialog Styling with Entry/Exit Transitions */
 dialog {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 1.5rem;
   max-width: 540px;
   width: 90%;
   margin: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+
+  /* Modern discrete transition */
+  opacity: 0;
+  scale: 0.96;
+  translate: 0 -12px;
+  transition:
+    display 0.25s,
+    opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    scale 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    translate 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    overlay 0.25s;
+  transition-behavior: allow-discrete;
+}
+
+dialog[open] {
+  opacity: 1;
+  scale: 1;
+  translate: 0 0;
+}
+
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 -12px;
+  }
 }
 
 dialog::backdrop {
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(2px);
+  background-color: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0px);
+  transition:
+    display 0.25s,
+    background-color 0.25s ease,
+    backdrop-filter 0.25s ease,
+    overlay 0.25s;
+  transition-behavior: allow-discrete;
+}
+
+dialog[open]::backdrop {
+  background-color: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(4px);
+}
+
+@starting-style {
+  dialog[open]::backdrop {
+    background-color: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
+  }
 }
 
 .dialog-header {
@@ -565,10 +765,12 @@ dialog::backdrop {
   color: var(--text-primary);
   font-family: inherit;
   font-size: 0.9rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .form-control:focus {
   outline: none;
   border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
 }
 
 .dialog-actions {
@@ -588,4 +790,65 @@ pre.report-content {
   white-space: pre-wrap;
   color: #e2e8f0;
   line-height: 1.5;
+}
+
+/* Toast Notification Styles */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.85rem 1.25rem;
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.12);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 280px;
+  max-width: 420px;
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.toast.toast-success { border-left: 4px solid #10b981; }
+.toast.toast-error { border-left: 4px solid #ef4444; }
+.toast.toast-info { border-left: 4px solid #38bdf8; }
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.toast.dismissing {
+  animation: toastSlideOut 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toastSlideOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(12px) scale(0.96); }
+}
+
+/* Reduced Motion Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  dialog, dialog[open], .workspace > *, .inv-item, .metric-card, .btn, .finding-card, .toast {
+    translate: none !important;
+    transform: none !important;
+    scale: 1 !important;
+  }
 }

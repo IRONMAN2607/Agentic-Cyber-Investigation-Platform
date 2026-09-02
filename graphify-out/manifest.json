@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "web/app.js": {
-    "mtime": 1788351072.1517248,
-    "seen": 1788353227.8164864,
-    "ast_hash": "a76d259a11e36457eec8de226c2f6280",
+    "mtime": 1788375821.919915,
+    "seen": 1788375838.0419137,
+    "ast_hash": "5877ec8ed6f7348e50dea08b8cd641d3",
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
@@ -642,9 +642,9 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1788351082.5912633,
-    "seen": 1788353227.8164864,
-    "ast_hash": "4975714761485c157c6bd0c2aa737eff",
+    "mtime": 1788375696.0519054,
+    "seen": 1788375838.0419137,
+    "ast_hash": "01b320b6aa1acaea992afb3aef616a88",
     "semantic_hash": ""
   },
   "migrations/env.py": {

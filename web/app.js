@@ -158,6 +158,18 @@
         </div>
       </div>
 
+      ${inv.status === "running" ? `
+        <div class="progress-container">
+          <div class="progress-header">
+            <span>Investigation pipeline executing tasks...</span>
+            <span class="pulse-indicator"></span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar-fill"></div>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Quick Navigation Tabs -->
       <div class="workspace-nav">
         <button class="nav-tab ${activeTab === 'all' ? 'active' : ''}" onclick="window.acipSetTab('all')">Overview (All)</button>
@@ -205,7 +217,7 @@
         </div>
         <div class="findings-list">
           ${data.findings.length === 0 ? `<div style="color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0;">No findings recorded yet. Run the investigation to evaluate detection rules.</div>` : data.findings.map(f => `
-            <div class="finding-card">
+            <div class="finding-card" data-severity="${f.severity.toLowerCase()}">
               <div class="finding-header">
                 <span class="finding-title">${escapeHtml(f.title)}</span>
                 <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -385,9 +397,10 @@
   window.acipStartInvestigation = async (invId) => {
     try {
       await api(`/investigations/${invId}/start`, { method: "POST" });
+      showToast("Investigation started & queued", "info");
       selectInvestigation(invId);
     } catch (e) {
-      alert(`Could not start run: ${e.message}`);
+      showToast(`Could not start run: ${e.message}`, "error");
     }
   };
 
@@ -395,6 +408,7 @@
     const rawEl = document.getElementById("report-text");
     if (!rawEl) return;
     navigator.clipboard.writeText(rawEl.textContent);
+    showToast("Incident report copied to clipboard", "success");
     const btn = document.getElementById("btn-copy-report");
     if (btn) {
       const orig = btn.textContent;
@@ -425,10 +439,11 @@
     try {
       await api(`/investigations/${invId}?purge=true`, { method: "DELETE" });
       currentInvId = null;
+      showToast("Investigation and evidence purged", "info");
       document.getElementById("workspace-view").innerHTML = `<div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">Investigation deleted. Select another from the sidebar or click <strong>+ New</strong>.</div>`;
       await loadInvestigations();
     } catch (e) {
-      alert(`Could not delete investigation: ${e.message}`);
+      showToast(`Could not delete investigation: ${e.message}`, "error");
     }
   };
 
@@ -520,9 +535,10 @@
       });
       setAuth(data.access_token, data.user);
       document.getElementById("modal-login").close();
+      showToast(`Welcome back, ${data.user.username}!`, "success");
       loadInvestigations();
     } catch (err) {
-      alert(`Login failed: ${err.message}`);
+      showToast(`Login failed: ${err.message}`, "error");
     }
   });
 
@@ -537,10 +553,11 @@
         body: JSON.stringify({ title, target_type, target_value }),
       });
       document.getElementById("modal-new-inv").close();
+      showToast("Investigation created successfully", "success");
       await loadInvestigations();
       selectInvestigation(inv.id);
     } catch (err) {
-      alert(`Failed to create investigation: ${err.message}`);
+      showToast(`Failed to create investigation: ${err.message}`, "error");
     }
   });
 
@@ -563,11 +580,31 @@
       });
       document.getElementById("modal-upload-artifact").close();
       fileInput.value = "";
+      showToast("Artifact uploaded & quarantined", "success");
       selectInvestigation(invId);
     } catch (err) {
-      alert(`Upload failed: ${err.message}`);
+      showToast(`Upload failed: ${err.message}`, "error");
     }
   });
+
+  function showToast(message, type = "info", duration = 4000) {
+    const container = document.getElementById("toast-container");
+    if (!container) return;
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    const icon = type === "success" ? "✓" : type === "error" ? "⚠" : "ℹ";
+    toast.innerHTML = `<span style="font-weight: 700; font-size: 1rem;">${icon}</span><span>${escapeHtml(message)}</span>`;
+    container.appendChild(toast);
+
+    const dismiss = () => {
+      if (toast.classList.contains("dismissing")) return;
+      toast.classList.add("dismissing");
+      toast.addEventListener("animationend", () => toast.remove(), { once: true });
+    };
+
+    setTimeout(dismiss, duration);
+    toast.addEventListener("click", dismiss);
+  }
 
   function escapeHtml(str) {
     if (!str) return "";
