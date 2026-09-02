@@ -1,4 +1,7 @@
-"""Investigation planning and orchestration."""
+"""Orchestrator Agent.
+
+Re-exports the core OrchestratorAgent, state tracking, and outcome models.
+"""
 
 from __future__ import annotations
 
@@ -9,18 +12,11 @@ from acip.core.orchestration.orchestrator import (
     OrchestratorAgent,
     TaskOutcome,
 )
-from acip.core.orchestration.planner import Plan, Planner, StaticPlanner, Task
-from acip.core.orchestration.runner import InvestigationRunner
 
 __all__ = [
     "InvestigationOutcome",
-    "InvestigationRunner",
     "InvestigationState",
     "Orchestrator",
     "OrchestratorAgent",
-    "Plan",
-    "Planner",
-    "StaticPlanner",
-    "Task",
     "TaskOutcome",
 ]

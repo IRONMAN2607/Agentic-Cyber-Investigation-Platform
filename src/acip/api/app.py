@@ -24,6 +24,7 @@ from acip.api.deps import Services
 from acip.api.routers import auth, investigations, system
 from acip.bootstrap import bootstrap
 from acip.config import Settings, get_settings
+from acip.core.llm.router import build_default_router
 from acip.core.orchestration.orchestrator import Orchestrator
 from acip.core.orchestration.planner import StaticPlanner
 from acip.core.orchestration.runner import InvestigationRunner
@@ -49,12 +50,14 @@ def build_services(settings: Settings, database: Database) -> Services:
     tools = build_tool_registry()
     agents = build_agent_registry()
     planner = StaticPlanner(agents)
+    router = build_default_router(settings)
     orchestrator = Orchestrator(
         database=database,
         settings=settings,
         agents=agents,
         tools=tools,
         planner=planner,
+        router=router,
     )
     runner = InvestigationRunner(orchestrator=orchestrator, database=database)
     return Services(
@@ -64,6 +67,7 @@ def build_services(settings: Settings, database: Database) -> Services:
         agents=agents,
         planner=planner,
         runner=runner,
+        router=router,
     )
 
 

@@ -1,9 +1,8 @@
 # Model Abstraction and Routing
 
-Design for `acip/core/llm/`. **Nothing in this document is implemented yet** — this is the Phase 0
-design for the subsystem §7 and §8 require, and it is the largest gap in the current codebase.
-Implementation lands in Phase 6, ahead of the reasoning agents that depend on it — see
-[roadmap.md](roadmap.md).
+Implemented in `src/acip/core/llm/` with tests in `tests/unit/test_llm_*.py`.
+Provides provider-agnostic model routing, candidate fallback chains, NVIDIA NIM
+integration (supporting Nemotron and DeepSeek R1), error handling, and structured outputs.
 
 ## 1. Why this layer exists
 
@@ -122,13 +121,18 @@ satisfying §8's requirement that quota exhaustion needs no code change.
 Reasoning that feeds the database must be structured. The router accepts a Pydantic model and
 guarantees the return value validates against it:
 
-1. Request provider-native constrained/JSON output where supported.
-2. Validate against the schema.
-3. On failure, retry the **same** model up to `schema_retries` with the validation error appended.
-4. On final failure, raise `SchemaValidationFailed`. The agent's task fails and is recorded.
+1. Dynamic schema template generation: converts Pydantic models into concrete, descriptive JSON
+   templates with explicit enum choices, avoiding raw `$defs` clutter.
+2. Request provider-native constrained/JSON output (`response_format={"type": "json_object"}`).
+3. Validate against the Pydantic schema using `model_validate_json()`.
+4. On failure, retry the **same** model up to `schema_retries` with the validation error appended.
+5. On final failure, raise `SchemaValidationFailed`. The agent's task fails and is recorded.
 
 There is no "best-effort parse" path and no regex salvage of malformed output. A model that cannot
 produce the required shape is a measurable result, not something to paper over.
+
+Default configuration pairs `meta/llama-3.2-11b-vision-instruct` (primary) and `openai/gpt-oss-20b`
+(secondary) across task classes for low-latency, strictly grounded JSON generation.
 
 ## 7. Observability
 

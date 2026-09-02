@@ -69,6 +69,19 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
+    # --- LLM & Model Router (NVIDIA NIM) -----------------------------------
+    nvidia_api_key: SecretStr = SecretStr("")
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    model_primary: str = "meta/llama-3.2-11b-vision-instruct"
+    model_secondary: str = "openai/gpt-oss-20b"
+    model_nemotron: str = "meta/llama-3.2-11b-vision-instruct"
+    model_deepseek: str = "openai/gpt-oss-20b"
+    llm_request_timeout_seconds: float = Field(default=60.0, ge=1.0)
+    llm_max_investigation_tokens: int = Field(default=200_000, ge=1_000)
+    llm_schema_retries: int = Field(default=2, ge=0, le=5)
+    enable_llm_triage: bool = Field(default=False)
+    enable_adaptive_planning: bool = Field(default=False)
+
     # --- Dev bootstrap (ignored in prod) ------------------------------------
     bootstrap_admin_username: str = "admin"
     bootstrap_admin_password: SecretStr = SecretStr("changeme-dev-only")

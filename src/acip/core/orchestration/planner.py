@@ -6,11 +6,12 @@ on the agent run and shown in the report, so an investigation can always answer
 "why was this step taken?".
 
 :class:`Planner` is a protocol with one deterministic implementation in this
-milestone. The seam matters: Phase 3 introduces an LLM-backed planner, and the
-research design needs the two to be swappable behind an identical interface so
-they can be compared on the same inputs. An LLM planner will be constrained to
-emitting :class:`Task` objects naming registered agents — it selects among known
-capabilities and never invents an executable step.
+milestone. The seam matters: Phase 7 introduces an LLM-backed planner (built on
+Phase 6 model abstraction), and the research design needs the two to be
+swappable behind an identical interface so they can be compared on the same
+inputs. An LLM planner will be constrained to emitting :class:`Task` objects
+naming registered agents — it selects among known capabilities and never
+invents an executable step.
 """
 
 from __future__ import annotations

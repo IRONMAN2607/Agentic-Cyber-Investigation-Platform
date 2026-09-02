@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,9 @@ from acip.core.evidence.store import EvidenceStore
 from acip.db.models import Artifact, Investigation
 from acip.tools.runner import ToolRunner
 from acip.types import AgentCapability, RunStatus
+
+if TYPE_CHECKING:
+    from acip.core.llm.router import ModelRouter
 
 
 @dataclass
@@ -37,6 +40,7 @@ class AgentContext:
     tools: ToolRunner
     settings: Settings
     agent_run_id: uuid.UUID
+    router: ModelRouter | None = None
 
     def artifacts_of_kind(self, *kinds: str) -> list[Artifact]:
         return [artifact for artifact in self.artifacts if artifact.kind in kinds]

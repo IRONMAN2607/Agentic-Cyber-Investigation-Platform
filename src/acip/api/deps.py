@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import sqlalchemy as sa
 from fastapi import Depends, Request
@@ -31,6 +31,9 @@ from acip.logging import bind_context
 from acip.tools.registry import ToolRegistry
 from acip.types import Role
 
+if TYPE_CHECKING:
+    from acip.core.llm.router import ModelRouter
+
 # auto_error=False so a missing header produces our own error envelope rather
 # than FastAPI's, keeping every 401 shaped the same.
 _bearer = HTTPBearer(auto_error=False)
@@ -46,6 +49,7 @@ class Services:
     agents: AgentRegistry
     planner: Planner
     runner: InvestigationRunner
+    router: ModelRouter | None = None
 
 
 def get_services(request: Request) -> Services:
