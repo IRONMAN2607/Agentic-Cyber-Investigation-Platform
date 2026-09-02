@@ -36,12 +36,15 @@ from acip.api.schemas import (
     StartResponse,
     TaskCreate,
     TaskRunResponse,
+    TextArtifactIngest,
     ToolRunResponse,
+    URLArtifactIngest,
 )
 from acip.core import audit
 from acip.core.evidence.store import MAX_EVIDENCE_PAGE, EvidenceStore
-from acip.core.security.files import store_stream
+from acip.core.security.files import store_bytes, store_stream
 from acip.core.security.ratelimit import investigation_limiter, rate_limit
+from acip.core.security.ssrf import SafeHTTPFetcher
 from acip.db.models import (
     AgentRun,
     Artifact,
@@ -313,7 +316,7 @@ async def upload_artifact(
     file: Annotated[UploadFile, File(description="Artifact to analyse")],
     kind: Annotated[ArtifactKind, Form()] = ArtifactKind.UNKNOWN,
 ) -> ArtifactResponse:
-    """Accept an artifact into content-addressed quarantine storage."""
+    """Accept an artifact into content-addressed quarantine storage with magic byte inspection."""
     if investigation.status_enum is not InvestigationStatus.CREATED:
         raise ConflictError(
             "artifacts can only be added before the investigation starts",
@@ -327,6 +330,7 @@ async def upload_artifact(
             dest_dir=settings.artifact_dir,
             max_bytes=settings.max_artifact_bytes,
             original_filename=file.filename or "",
+            declared_kind=kind,
         )
     except Exception as exc:
         await audit.record(
@@ -342,7 +346,7 @@ async def upload_artifact(
 
     artifact = Artifact(
         investigation_id=investigation.id,
-        kind=kind.value,
+        kind=stored.detected_kind.value if kind is ArtifactKind.UNKNOWN else kind.value,
         original_filename=stored.safe_filename,
         sha256=stored.sha256,
         size_bytes=stored.size_bytes,
@@ -363,6 +367,153 @@ async def upload_artifact(
             "sha256": stored.sha256,
             "size_bytes": stored.size_bytes,
             "declared_kind": kind.value,
+            "detected_kind": stored.detected_kind.value,
+        },
+    )
+    return ArtifactResponse.model_validate(artifact)
+
+
+@router.post(
+    "/{investigation_id}/artifacts/url",
+    response_model=ArtifactResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit(investigation_limiter))],
+)
+async def ingest_url_artifact(
+    investigation: LoadedInvestigation,
+    payload: URLArtifactIngest,
+    user: Investigator,
+    services: Annotated[Services, Depends(get_services)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ArtifactResponse:
+    """Ingest content from a remote URL via SSRF-protected safe HTTP fetch."""
+    if investigation.status_enum is not InvestigationStatus.CREATED:
+        raise ConflictError(
+            "artifacts can only be added before the investigation starts",
+            detail={"status": investigation.status},
+        )
+
+    settings = services.settings
+    fetcher = SafeHTTPFetcher(
+        max_bytes=settings.max_artifact_bytes,
+        max_redirects=3,
+        timeout_seconds=10.0,
+    )
+    try:
+        fetch_res = await fetcher.fetch_url(payload.url)
+        stored = await store_bytes(
+            fetch_res.content,
+            dest_dir=settings.artifact_dir,
+            max_bytes=settings.max_artifact_bytes,
+            original_filename=f"url_response_{fetch_res.sha256[:8]}.bin",
+            declared_kind=payload.declared_kind,
+        )
+    except Exception as exc:
+        await audit.record(
+            session,
+            actor=user.username,
+            action=audit.ARTIFACT_REJECTED,
+            resource_type="investigation",
+            resource_id=str(investigation.id),
+            outcome=audit.FAILURE,
+            detail={"url": payload.url, "reason": f"{type(exc).__name__}: {exc}"},
+        )
+        raise
+
+    artifact = Artifact(
+        investigation_id=investigation.id,
+        kind=payload.declared_kind.value,
+        original_filename=stored.safe_filename,
+        sha256=stored.sha256,
+        size_bytes=stored.size_bytes,
+        storage_path=str(stored.path),
+        uploaded_by=user.id,
+    )
+    session.add(artifact)
+    await session.flush()
+
+    await audit.record(
+        session,
+        actor=user.username,
+        action=audit.ARTIFACT_UPLOADED,
+        resource_type="artifact",
+        resource_id=str(artifact.id),
+        detail={
+            "investigation_id": str(investigation.id),
+            "sha256": stored.sha256,
+            "size_bytes": stored.size_bytes,
+            "source_url": payload.url,
+            "declared_kind": payload.declared_kind.value,
+        },
+    )
+    return ArtifactResponse.model_validate(artifact)
+
+
+@router.post(
+    "/{investigation_id}/artifacts/text",
+    response_model=ArtifactResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit(investigation_limiter))],
+)
+async def ingest_text_artifact(
+    investigation: LoadedInvestigation,
+    payload: TextArtifactIngest,
+    user: Investigator,
+    services: Annotated[Services, Depends(get_services)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ArtifactResponse:
+    """Ingest raw text/log/indicator directly into quarantine storage."""
+    if investigation.status_enum is not InvestigationStatus.CREATED:
+        raise ConflictError(
+            "artifacts can only be added before the investigation starts",
+            detail={"status": investigation.status},
+        )
+
+    settings = services.settings
+    content_bytes = payload.content.encode("utf-8")
+    try:
+        stored = await store_bytes(
+            content_bytes,
+            dest_dir=settings.artifact_dir,
+            max_bytes=settings.max_artifact_bytes,
+            original_filename=payload.filename or "pasted_artifact.txt",
+            declared_kind=payload.declared_kind,
+        )
+    except Exception as exc:
+        await audit.record(
+            session,
+            actor=user.username,
+            action=audit.ARTIFACT_REJECTED,
+            resource_type="investigation",
+            resource_id=str(investigation.id),
+            outcome=audit.FAILURE,
+            detail={"reason": f"{type(exc).__name__}: {exc}"},
+        )
+        raise
+
+    artifact = Artifact(
+        investigation_id=investigation.id,
+        kind=payload.declared_kind.value,
+        original_filename=stored.safe_filename,
+        sha256=stored.sha256,
+        size_bytes=stored.size_bytes,
+        storage_path=str(stored.path),
+        uploaded_by=user.id,
+    )
+    session.add(artifact)
+    await session.flush()
+
+    await audit.record(
+        session,
+        actor=user.username,
+        action=audit.ARTIFACT_UPLOADED,
+        resource_type="artifact",
+        resource_id=str(artifact.id),
+        detail={
+            "investigation_id": str(investigation.id),
+            "sha256": stored.sha256,
+            "size_bytes": stored.size_bytes,
+            "declared_kind": payload.declared_kind.value,
         },
     )
     return ArtifactResponse.model_validate(artifact)

@@ -16,7 +16,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from acip.types import (
     ArtifactKind,
@@ -75,6 +75,27 @@ class InvestigationCreate(BaseModel):
         if not stripped:
             raise ValueError("must not be blank")
         return stripped
+
+    @model_validator(mode="after")
+    def _validate_target(self) -> InvestigationCreate:
+        from acip.core.security.validation import validate_target_value
+
+        try:
+            self.target_value = validate_target_value(self.target_type, self.target_value)
+        except Exception as exc:
+            raise ValueError(str(exc)) from exc
+        return self
+
+
+class URLArtifactIngest(BaseModel):
+    url: str = Field(min_length=1, max_length=4096)
+    declared_kind: ArtifactKind = ArtifactKind.URL_RESPONSE
+
+
+class TextArtifactIngest(BaseModel):
+    content: str = Field(min_length=1)
+    filename: str = Field(default="pasted_artifact.txt", max_length=255)
+    declared_kind: ArtifactKind = ArtifactKind.GENERIC_TEXT
 
 
 class ArtifactResponse(BaseModel):
