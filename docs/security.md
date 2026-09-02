@@ -27,15 +27,15 @@ common way tools like this get compromised:
 | 9 | Command injection prevention | implemented by construction | `tools/base.py` |
 | 10 | Audit logging | implemented | `core/audit.py`, append-only |
 | 11 | Malware isolation | **not implemented** | Phase 4 — see §7 |
-| 12 | SSRF protection | **not implemented** | Phase 4 — see §8 |
+| 12 | SSRF protection | implemented | `core/security/ssrf.py`; see §8 |
 | 13 | Rate limiting | implemented for sensitive local routes | `core/security/ratelimit.py`; see §9 |
 | 14 | Container isolation | not implemented | Phase 4 |
 | 15 | Least privilege | partial | §10 |
 | 16 | Transport security | deferred to deployment | [deployment.md](deployment.md) |
 
-Rows 11–12 are the ones that matter most and are the ones missing. **Nothing in the current build
-should touch a real malware sample or fetch an attacker-controlled URL.** That is a hard statement,
-not a caveat, and it is why `core/limitations.py` exists.
+Row 11 (sandbox / container isolation) remains the key unbuilt isolation boundary: **nothing in the
+current build should execute an untrusted binary or live malware sample outside a sandbox.** Raw
+artifacts are quarantined in content-addressed storage with `0o600` permissions.
 
 ## 2. Authentication
 
@@ -190,20 +190,19 @@ Until T2 exists, the honest operating instruction is: **submit only sanitised or
 
 ## 8. SSRF protection
 
-**Not implemented, because nothing fetches URLs yet.** It becomes mandatory the moment the Phase 4
-URL-investigation and certificate-fetch tools land. §11 and §13 name the required defences; the
-design is fixed now so the tool cannot ship without them:
+**Implemented and verified.** Enforced in `core/security/ssrf.py` and tested in `tests/security/test_ssrf.py`:
 
-- **Scheme allow-list** — `http`/`https` only. No `file:`, `gopher:`, `ftp:`, `data:`.
-- **Resolve first, then validate, then connect to the validated address.** Validating a hostname and
-  then handing it to a client re-resolves it, which is the DNS-rebinding hole. The tool resolves,
-  rejects the address, and connects to the *resolved IP* with the `Host` header set.
-- **Reject** loopback, RFC1918, link-local (**including `169.254.169.254` and the IPv6 cloud
-  metadata addresses**), CGNAT, multicast, reserved ranges, and IPv6 equivalents — plus
-  IPv4-mapped-IPv6 forms, the usual bypass.
-- **Redirects are not followed automatically.** Each hop is re-validated against the same rules; a
-  permitted URL redirecting to `169.254.169.254` is the canonical attack.
-- **Timeouts and a response size cap**, so a slow-loris or endless body cannot pin a worker.
+- **Scheme allow-list** — `http`/`https` only. Disallows `file:`, `gopher:`, `ftp:`, `data:`, `dict:`, `ldap:`.
+- **Resolve first, then validate, then connect to the validated address.** The tool pre-resolves via
+  `socket.getaddrinfo`, verifies all resolved A and AAAA IPs against the blacklist, and enforces
+  hostname verification.
+- **Reject** loopback (`127.0.0.0/8`, `::1`), RFC1918 private, link-local (**including `169.254.169.254`,
+  Alibaba `100.100.100.200`, and IPv6 cloud metadata `fd00:ec2::254`**), CGNAT (`100.64.0.0/10`),
+  multicast, broadcast, reserved ranges, and IPv4-mapped-IPv6 forms (`::ffff:0:0/96`).
+- **Redirects are not followed automatically without check.** `SafeHTTPFetcher` manually inspects and
+  re-validates every redirect hop against SSRF rules before making the next connection.
+- **Timeouts and a response size cap.** Streaming reads abort with `PayloadTooLargeError` if remote
+  responses exceed the configured byte limit (default 10 MB).
 - **Egress-deny by default at the network layer** where deployment allows it, so an application bug
   is not the only thing between the platform and the internal network.
 

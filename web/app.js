@@ -5,6 +5,7 @@
   let currentToken = localStorage.getItem("acip_token") || "";
   let currentInvId = null;
   let pollInterval = null;
+  let activeTab = "all";
 
   // --- API Client ---
   async function api(path, options = {}) {
@@ -97,13 +98,17 @@
     currentInvId = id;
     loadInvestigations();
     const ws = document.getElementById("workspace-view");
-    ws.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted);">Loading workspace...</div>`;
+    ws.innerHTML = `<div style="padding: 3rem; text-align: center; color: var(--text-muted);">Loading investigation workspace...</div>`;
 
     if (pollInterval) clearInterval(pollInterval);
 
     try {
-      const detail = await api(`/investigations/${id}`);
-      renderWorkspace(detail);
+      const [detail, evidenceData] = await Promise.all([
+        api(`/investigations/${id}`),
+        api(`/investigations/${id}/evidence?limit=100`).catch(() => ({ items: [] }))
+      ]);
+
+      renderWorkspace(detail, evidenceData.items || []);
 
       if (detail.investigation.status === "running") {
         pollInterval = setInterval(async () => {
@@ -111,9 +116,12 @@
             clearInterval(pollInterval);
             return;
           }
-          const fresh = await api(`/investigations/${id}`);
-          renderWorkspace(fresh);
-          if (fresh.investigation.status !== "running") {
+          const [freshDetail, freshEvidence] = await Promise.all([
+            api(`/investigations/${id}`),
+            api(`/investigations/${id}/evidence?limit=100`).catch(() => ({ items: [] }))
+          ]);
+          renderWorkspace(freshDetail, freshEvidence.items || []);
+          if (freshDetail.investigation.status !== "running") {
             clearInterval(pollInterval);
             loadInvestigations();
           }
@@ -124,53 +132,63 @@
     }
   }
 
-  function renderWorkspace(data) {
+  function renderWorkspace(data, evidenceItems = []) {
     const inv = data.investigation;
     const ws = document.getElementById("workspace-view");
 
     ws.innerHTML = `
-      <!-- Hero -->
+      <!-- Hero Banner -->
       <div class="hero-banner">
         <div class="hero-info">
           <h2>${escapeHtml(inv.title)}</h2>
           <div class="hero-meta">
-            <span>ID: <code>${inv.display_id}</code></span>
-            <span>Target: <strong>${escapeHtml(inv.target_type)}</strong> (${escapeHtml(inv.target_value)})</span>
+            <span>ID: <code>${escapeHtml(inv.display_id)}</code></span>
+            <span>Target: <strong>${escapeHtml(inv.target_type)}</strong> (<code>${escapeHtml(inv.target_value)}</code>)</span>
             <span>Status: <span class="badge badge-${inv.status}">${inv.status}</span></span>
           </div>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.6rem; align-items: center;">
           ${inv.status === "created" ? `
             <button class="btn btn-secondary" onclick="window.acipOpenUpload('${inv.id}')">+ Upload Artifact</button>
             <button class="btn btn-primary" onclick="window.acipStartInvestigation('${inv.id}')">▶ Start Run</button>
           ` : `
             <button class="btn btn-outline" onclick="window.acipSelect('${inv.id}')">↻ Refresh</button>
           `}
+          <button class="btn btn-outline btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.35);" onclick="window.acipDeleteInvestigation('${inv.id}', '${escapeHtml(inv.title)}')" title="Delete & Purge this Investigation">🗑 Delete</button>
         </div>
       </div>
 
-      <!-- Metrics -->
+      <!-- Quick Navigation Tabs -->
+      <div class="workspace-nav">
+        <button class="nav-tab ${activeTab === 'all' ? 'active' : ''}" onclick="window.acipSetTab('all')">Overview (All)</button>
+        <button class="nav-tab ${activeTab === 'findings' ? 'active' : ''}" onclick="window.acipSetTab('findings')">Findings (${data.findings.length})</button>
+        <button class="nav-tab ${activeTab === 'evidence' ? 'active' : ''}" onclick="window.acipSetTab('evidence')">Evidence (${data.counts.evidence || evidenceItems.length})</button>
+        <button class="nav-tab ${activeTab === 'trace' ? 'active' : ''}" onclick="window.acipSetTab('trace')">Execution Trace (${data.agent_runs.length + data.tool_runs.length})</button>
+        ${data.report ? `<button class="nav-tab ${activeTab === 'report' ? 'active' : ''}" onclick="window.acipSetTab('report')">Incident Report</button>` : ''}
+      </div>
+
+      <!-- Metrics Cards Grid -->
       <div class="metrics-grid">
         <div class="metric-card">
-          <div class="metric-label">Severity</div>
+          <div class="metric-label">Severity Level</div>
           <div class="metric-value">
-            <span class="badge badge-${inv.severity || 'info'}" style="font-size: 1rem; padding: 0.35rem 0.75rem;">
+            <span class="badge badge-${inv.severity || 'info'}" style="font-size: 0.95rem; padding: 0.35rem 0.75rem;">
               ${inv.severity ? inv.severity.toUpperCase() : 'N/A'}
             </span>
           </div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Risk Score</div>
+          <div class="metric-label">Calculated Risk</div>
           <div class="metric-value" style="color: ${inv.risk_score > 50 ? 'var(--sev-high)' : 'var(--brand-primary)'}">
-            ${inv.risk_score !== null ? inv.risk_score : '-'} <span style="font-size: 0.9rem; color: var(--text-muted);">/ 100</span>
+            ${inv.risk_score !== null ? inv.risk_score : '-'} <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 400;">/ 100</span>
           </div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Artifacts</div>
+          <div class="metric-label">Artifacts Stored</div>
           <div class="metric-value">${data.counts.artifacts}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Findings</div>
+          <div class="metric-label">Grounded Findings</div>
           <div class="metric-value">${data.counts.findings}</div>
         </div>
         <div class="metric-card">
@@ -179,78 +197,142 @@
         </div>
       </div>
 
-      <!-- Findings Section -->
-      <div class="section-card">
+      <!-- Grounded Findings Section -->
+      <div id="section-findings" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'findings' ? 'block' : 'none'};">
         <div class="section-card-header">
           <span>Grounded Findings (${data.findings.length})</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Bound to deterministic evidence (G0–G4)</span>
         </div>
         <div class="findings-list">
-          ${data.findings.length === 0 ? `<div style="color: var(--text-muted); font-size: 0.9rem;">No findings recorded yet.</div>` : data.findings.map(f => `
+          ${data.findings.length === 0 ? `<div style="color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0;">No findings recorded yet. Run the investigation to evaluate detection rules.</div>` : data.findings.map(f => `
             <div class="finding-card">
               <div class="finding-header">
                 <span class="finding-title">${escapeHtml(f.title)}</span>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                  <span class="badge badge-info">${f.assertion_class}</span>
+                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                  <span class="badge badge-${f.assertion_class.toLowerCase()}">${f.assertion_class}</span>
                   <span class="badge badge-${f.severity}">${f.severity}</span>
-                  <span style="font-size: 0.8rem; color: var(--text-muted);">Conf: ${(f.confidence * 100).toFixed(0)}%</span>
+                  <span style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono);">Conf: ${(f.confidence * 100).toFixed(0)}%</span>
                 </div>
               </div>
               <p class="finding-desc">${escapeHtml(f.description)}</p>
-              ${f.reasoning ? `<div class="finding-reasoning"><strong>Reasoning:</strong> ${escapeHtml(f.reasoning)}</div>` : ''}
-              <div class="chips-list">
-                ${f.evidence_ids.map(eid => `<span class="chip">Cited: ${eid.slice(0, 8)}...</span>`).join('')}
-              </div>
+              ${f.reasoning ? `<div class="finding-reasoning"><strong>Reasoning / Rule Logic:</strong> ${escapeHtml(f.reasoning)}</div>` : ''}
+              ${f.evidence_ids && f.evidence_ids.length > 0 ? `
+                <div class="chips-list">
+                  <span style="color: var(--text-muted); font-weight: 500;">Cited Evidence:</span>
+                  ${f.evidence_ids.map(eid => `
+                    <button class="chip" style="cursor: pointer;" onclick="window.acipInspectProvenance('${inv.id}', '${eid}')" title="Click to view Cryptographic Provenance Chain">
+                      🔍 ${eid.slice(0, 8)}...
+                    </button>
+                  `).join('')}
+                </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>
       </div>
 
-      <!-- Execution Trace -->
-      <div class="section-card">
+      <!-- Grounded Evidence Items Section -->
+      <div id="section-evidence" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'evidence' ? 'block' : 'none'};">
         <div class="section-card-header">
-          <span>Execution Trace</span>
+          <span>Grounded Evidence Stream (${evidenceItems.length || data.counts.evidence})</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Immutable append-only records with provenance</span>
         </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Agent / Tool</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Duration</th>
-              <th>Outcome / Rationale</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.agent_runs.map(ar => `
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
               <tr>
-                <td><strong>${escapeHtml(ar.agent_name)}</strong> (v${ar.agent_version})</td>
-                <td><span class="badge badge-info">AGENT</span></td>
-                <td><span class="badge badge-${ar.status}">${ar.status}</span></td>
-                <td>${ar.duration_ms !== null ? ar.duration_ms + 'ms' : '-'}</td>
-                <td>${escapeHtml(ar.rationale || '-')}</td>
+                <th>Evidence ID / Hash</th>
+                <th>Source Tool</th>
+                <th>Kind</th>
+                <th>Observed At</th>
+                <th>Confidence</th>
+                <th>Payload Summary</th>
+                <th>Action</th>
               </tr>
-            `).join('')}
-            ${data.tool_runs.map(tr => `
-              <tr>
-                <td><code>${escapeHtml(tr.tool_name)}</code> (v${tr.tool_version})</td>
-                <td><span class="badge badge-low">TOOL (${tr.sandbox_tier})</span></td>
-                <td><span class="badge badge-${tr.status}">${tr.status}</span></td>
-                <td>${tr.duration_ms !== null ? tr.duration_ms + 'ms' : '-'}</td>
-                <td>Produced ${tr.evidence_count} evidence item(s)</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${evidenceItems.length === 0 ? `
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No evidence records collected yet.</td></tr>
+              ` : evidenceItems.map(ev => `
+                <tr>
+                  <td><code>${ev.id.slice(0, 8)}...</code></td>
+                  <td><strong>${escapeHtml(ev.source_tool)}</strong></td>
+                  <td><span class="badge badge-info">${escapeHtml(ev.kind)}</span></td>
+                  <td>${ev.observed_at ? new Date(ev.observed_at).toLocaleString() : 'N/A'} <span style="font-size: 0.7rem; color: var(--text-muted);">(${ev.time_confidence})</span></td>
+                  <td>${(ev.confidence * 100).toFixed(0)}%</td>
+                  <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(JSON.stringify(ev.data))}">
+                    ${escapeHtml(JSON.stringify(ev.data))}
+                  </td>
+                  <td>
+                    <button class="btn btn-outline btn-sm" onclick="window.acipInspectProvenance('${inv.id}', '${ev.id}')">
+                      Provenance
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- Report Section -->
+      <!-- Execution Trace Section -->
+      <div id="section-trace" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'trace' ? 'block' : 'none'};">
+        <div class="section-card-header">
+          <span>Execution Trace & Agent Coordination</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Audited execution steps emitted for evaluation</span>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Component / Name</th>
+                <th>Class</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Outcome / Audit Rationale</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.agent_runs.length === 0 && data.tool_runs.length === 0 ? `
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No agent or tool executions recorded yet.</td></tr>
+              ` : ''}
+              ${data.agent_runs.map(ar => `
+                <tr>
+                  <td><strong>${escapeHtml(ar.agent_name)}</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">(v${ar.agent_version})</span></td>
+                  <td><span class="badge badge-inference">AGENT</span></td>
+                  <td><span class="badge badge-${ar.status}">${ar.status}</span></td>
+                  <td>${ar.duration_ms !== null ? ar.duration_ms + 'ms' : '-'}</td>
+                  <td>${escapeHtml(ar.rationale || 'Agent execution completed successfully')}</td>
+                </tr>
+              `).join('')}
+              ${data.tool_runs.map(tr => `
+                <tr>
+                  <td><code>${escapeHtml(tr.tool_name)}</code> <span style="font-size: 0.75rem; color: var(--text-muted);">(v${tr.tool_version})</span></td>
+                  <td><span class="badge badge-low">TOOL (${tr.sandbox_tier})</span></td>
+                  <td><span class="badge badge-${tr.status}">${tr.status}</span></td>
+                  <td>${tr.duration_ms !== null ? tr.duration_ms + 'ms' : '-'}</td>
+                  <td>Produced <strong>${tr.evidence_count}</strong> evidence item(s)</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Executive Report Section -->
       ${data.report ? `
-        <div class="section-card">
+        <div id="section-report" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'report' ? 'block' : 'none'};">
           <div class="section-card-header">
             <span>Executive Investigation Report</span>
-            <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('report-text').textContent)">Copy Report</button>
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="btn-toggle-raw-report" class="btn btn-outline btn-sm" onclick="window.acipToggleReportView()">View Raw Markdown</button>
+              <button id="btn-copy-report" class="btn btn-primary btn-sm" onclick="window.acipCopyReport()">Copy Report</button>
+            </div>
           </div>
-          <div style="padding: 1rem;">
+          <div id="report-rendered-view" class="report-body">
+            ${renderMarkdown(data.report.content)}
+          </div>
+          <div id="report-raw-view" style="display: none; padding: 1rem;">
             <pre id="report-text" class="report-content">${escapeHtml(data.report.content)}</pre>
           </div>
         </div>
@@ -258,18 +340,153 @@
     `;
   }
 
-  // --- Global Handlers for inline UI onclick ---
+  // --- Simple Markdown Formatter ---
+  function renderMarkdown(md) {
+    if (!md) return "";
+    let html = escapeHtml(md);
+
+    // Headers
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+    // Blockquotes
+    html = html.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>');
+
+    // Bold & Italic
+    html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+    html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
+
+    // Inline Code
+    html = html.replace(/`([^`]+)`/gim, '<code>$1</code>');
+
+    // Unordered List items
+    html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+    // Newlines to paragraph breaks
+    html = html.replace(/\n\n/g, '<br><br>');
+
+    return html;
+  }
+
+  // --- Global Window Handlers ---
   window.acipSelect = selectInvestigation;
+  window.acipSetTab = (tab) => {
+    activeTab = tab;
+    if (currentInvId) selectInvestigation(currentInvId);
+  };
+
   window.acipOpenUpload = (invId) => {
     document.getElementById("upload-inv-id").value = invId;
     document.getElementById("modal-upload-artifact").showModal();
   };
+
   window.acipStartInvestigation = async (invId) => {
     try {
       await api(`/investigations/${invId}/start`, { method: "POST" });
       selectInvestigation(invId);
     } catch (e) {
       alert(`Could not start run: ${e.message}`);
+    }
+  };
+
+  window.acipCopyReport = () => {
+    const rawEl = document.getElementById("report-text");
+    if (!rawEl) return;
+    navigator.clipboard.writeText(rawEl.textContent);
+    const btn = document.getElementById("btn-copy-report");
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = "✓ Copied!";
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }
+  };
+
+  window.acipToggleReportView = () => {
+    const rendered = document.getElementById("report-rendered-view");
+    const raw = document.getElementById("report-raw-view");
+    const btn = document.getElementById("btn-toggle-raw-report");
+    if (raw.style.display === "none") {
+      raw.style.display = "block";
+      rendered.style.display = "none";
+      btn.textContent = "View Rendered";
+    } else {
+      raw.style.display = "none";
+      rendered.style.display = "block";
+      btn.textContent = "View Raw Markdown";
+    }
+  };
+
+  window.acipDeleteInvestigation = async (invId, title) => {
+    if (!confirm(`Are you sure you want to delete / purge investigation "${title}"?\n\nThis will explicitly purge all associated evidence and audit records.`)) {
+      return;
+    }
+    try {
+      await api(`/investigations/${invId}?purge=true`, { method: "DELETE" });
+      currentInvId = null;
+      document.getElementById("workspace-view").innerHTML = `<div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">Investigation deleted. Select another from the sidebar or click <strong>+ New</strong>.</div>`;
+      await loadInvestigations();
+    } catch (e) {
+      alert(`Could not delete investigation: ${e.message}`);
+    }
+  };
+
+  window.acipInspectProvenance = async (invId, evidenceId) => {
+    const modal = document.getElementById("modal-provenance");
+    const container = document.getElementById("provenance-details");
+    container.innerHTML = `<div style="padding: 1rem; text-align: center; color: var(--text-muted);">Resolving provenance chain...</div>`;
+    modal.showModal();
+
+    try {
+      const prov = await api(`/investigations/${invId}/evidence/${evidenceId}/provenance`);
+      const ev = prov.evidence;
+      const tool = prov.tool_run;
+      const art = prov.artifact;
+      const ag = prov.agent_run;
+
+      container.innerHTML = `
+        <div style="background-color: var(--bg-primary); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; color: var(--brand-primary); margin-bottom: 0.25rem;">1. Evidence Observation</div>
+          <div>ID: <code>${ev.id}</code></div>
+          <div>Kind: <strong>${escapeHtml(ev.kind)}</strong> (${ev.time_confidence})</div>
+          <div>Content Hash: <code>${ev.content_hash}</code></div>
+        </div>
+
+        <div style="background-color: var(--bg-primary); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; color: #34d399; margin-bottom: 0.25rem;">2. Deterministic Tool Execution (G1 Compliance)</div>
+          ${tool ? `
+            <div>Tool: <strong>${escapeHtml(tool.tool_name)}</strong> (v${tool.tool_version})</div>
+            <div>Run ID: <code>${tool.id}</code></div>
+            <div>Sandbox Tier: <span class="badge badge-low">${tool.sandbox_tier}</span></div>
+            <div>Status: <span class="badge badge-${tool.status}">${tool.status}</span> (${tool.duration_ms}ms)</div>
+          ` : `<div style="color: var(--sev-critical);">No deterministic tool execution found!</div>`}
+        </div>
+
+        <div style="background-color: var(--bg-primary); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; color: #a5b4fc; margin-bottom: 0.25rem;">3. Source Artifact</div>
+          ${art ? `
+            <div>Filename: <code>${escapeHtml(art.original_filename)}</code></div>
+            <div>SHA-256: <code>${art.sha256}</code></div>
+            <div>Quarantine Size: ${art.size_bytes} bytes (${art.kind})</div>
+          ` : `<div style="color: var(--text-muted);">No input artifact linked.</div>`}
+        </div>
+
+        ${prov.gaps && prov.gaps.length > 0 ? `
+          <div style="background-color: rgba(239, 68, 68, 0.15); border: 1px solid var(--sev-critical); padding: 0.75rem; border-radius: 6px; color: #f87171;">
+            <strong>Identified Gaps:</strong>
+            <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+              ${prov.gaps.map(g => `<li>${escapeHtml(g)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : `
+          <div style="color: #34d399; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+            ✓ Provenance chain is complete, verifiable, and G1 grounded.
+          </div>
+        `}
+      `;
+    } catch (e) {
+      container.innerHTML = `<div style="color: var(--sev-critical); padding: 1rem;">Could not resolve provenance: ${escapeHtml(e.message)}</div>`;
     }
   };
 

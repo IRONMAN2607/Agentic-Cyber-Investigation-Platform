@@ -45,7 +45,7 @@ jobs:
         run: uv run ruff format --check src tests
 
       - name: Run mypy type checker
-        run: uv run mypy src
+        run: uv run mypy src tests
 
       - name: Run pytest test suite
         run: uv run pytest --tb=short

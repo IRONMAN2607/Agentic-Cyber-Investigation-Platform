@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ACIP — Agentic Cyber Investigation Platform</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2.2">
 </head>
 <body>
   <header>
@@ -122,6 +122,20 @@
     </form>
   </dialog>
 
-  <script src="app.js"></script>
+  <!-- Native HTML Dialog: Evidence Provenance Inspection -->
+  <dialog id="modal-provenance" style="max-width: 600px;">
+    <div class="dialog-header">
+      <h3 class="dialog-title">Evidence Provenance Chain</h3>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('modal-provenance').close()">✕</button>
+    </div>
+    <div id="provenance-details" style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+      Loading provenance chain...
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('modal-provenance').close()">Close</button>
+    </div>
+  </dialog>
+
+  <script src="app.js?v=2.2"></script>
 </body>
 </html>

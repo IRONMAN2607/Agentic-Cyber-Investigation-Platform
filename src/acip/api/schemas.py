@@ -417,6 +417,7 @@ class CapabilitiesResponse(BaseModel):
     agents: list[str]
     planner: str
     not_implemented: list[str]
+    operating_boundary: str
 
 
 class AdminCapabilitiesResponse(BaseModel):
@@ -427,6 +428,7 @@ class AdminCapabilitiesResponse(BaseModel):
     agents: list[AgentCapabilityInfo]
     planner: str
     not_implemented: list[str]
+    operating_boundary: str
 
 
 class HealthResponse(BaseModel):

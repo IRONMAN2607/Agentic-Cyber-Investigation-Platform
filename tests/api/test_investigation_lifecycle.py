@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import uuid
 
@@ -207,4 +208,36 @@ async def test_investigation_lifecycle_failure_paths(
     )
     assert retry_resp.status_code == 200
     assert retry_resp.json()["accepted"] is True
+    await services.runner.wait_all()
+
+
+async def test_investigation_concurrent_start_requests(
+    client: AsyncClient,
+    investigator_auth: dict[str, str],
+    app: FastAPI,
+) -> None:
+    """Concurrent start requests elect exactly one starter; the rest receive 409 Conflict."""
+    create_resp = await client.post(
+        "/api/v1/investigations",
+        json={"title": "Concurrent Start Test", "target_type": "log", "target_value": "auth.log"},
+        headers=investigator_auth,
+    )
+    assert create_resp.status_code == 201
+    inv_id = create_resp.json()["id"]
+
+    responses = await asyncio.gather(
+        *[
+            client.post(f"/api/v1/investigations/{inv_id}/start", headers=investigator_auth)
+            for _ in range(10)
+        ]
+    )
+
+    statuses = [r.status_code for r in responses]
+    assert statuses.count(200) == 1
+    assert statuses.count(409) == 9
+
+    accepted_resp = next(r.json() for r in responses if r.status_code == 200)
+    assert accepted_resp["accepted"] is True
+
+    services = app.state.services
     await services.runner.wait_all()

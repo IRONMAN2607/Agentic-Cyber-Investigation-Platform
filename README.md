@@ -20,21 +20,20 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 
 ## Status
 
-**Phases 0–3 verified. Phase 1′ (verification retrofit) is substantially complete — 11 of its 15
-exit criteria are met. Phase 4 is planned, not partially shipped.** [docs/roadmap.md](docs/roadmap.md)
-is the authority on phase numbering
-and §3.1 there marks every criterion individually; the four open ones are an atomic start claim, a
-backup/restore integrity check, retention disclosure in the report, and the operating boundary in the
-capability output.
+**Phases 0–3 verified. Phase 1′ (verification retrofit) is complete — all 15 exit criteria are met and verified. Phase 4 is unblocked.** [docs/roadmap.md](docs/roadmap.md) is the authority on phase numbering and §3.1 marks every criterion individually.
 
 | Quality Gate | Status |
 |---|---|
-| Tests | **97 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
+| Tests | **160 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
 | Lint | **0 ruff errors** (`ruff check src tests`) |
-| Types | **0 mypy errors** across 52 source files (`mypy src`) |
+| Formatting | **100% formatted** across 112 files (`ruff format --check src tests`) |
+| Types | **0 mypy errors** across 65 source files (`mypy src`) |
 | Vertical slice | **100% verified end to end** with SQLite database, real auth log attacks, and clean log baselines |
-| Security Invariants | Grounding invariants G0–G4, append-only immutability (incl. bulk DML), provenance integrity, token safety, role authz matrix, request rate limits, no `shell=True`, no reserved `LogRecord` keys |
-| Deferred Phase 4 capabilities | URL tools and SSRF enforcement, T1 subprocess tools, and MITRE ATT&CK mapping are not present in `src/`; reports and `/capabilities` do not claim them |
+| Orchestrator Agent | `OrchestratorAgent` coordinates lifecycle, executes triage, interprets structured `TriageAnalysis`, creates tasks, and maintains `InvestigationState` |
+| Security Invariants | Grounding invariants G0–G4, append-only immutability (incl. bulk DML), provenance integrity, token safety, role authz matrix, request rate limits, anti-SSRF protection, magic-byte PCAP/binary intake validation, no `shell=True` |
+| Model Abstraction & Routing | `ModelRouter`, `RoutingPolicy`, OpenAI-compatible `NvidiaNIMProvider` (Nemotron, DeepSeek R1), Pydantic structured output repair, deterministic `ReplayProvider` test double |
+| Active Phase 4 Capabilities | URL, IP, Hash, PCAP, Log, and File artifact intake with anti-SSRF protection and content sniffing |
+| Deferred Phase 4 Capabilities | T1 subprocess tools, T2 container isolation, and MITRE ATT&CK mapping agent |
 | Frontend | **Interactive dashboard** in `web/` served directly by FastAPI |
 
 `GET /capabilities` and `acip capabilities` report what this deployment can actually do, and

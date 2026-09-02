@@ -5,10 +5,11 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from acip.api.deps import (
@@ -379,13 +380,27 @@ async def start_investigation(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> StartResponse:
     """Queue the investigation for execution."""
-    if investigation.status_enum is not InvestigationStatus.CREATED:
+    # Do not turn the loaded object's status into a claim: two requests can
+    # both have loaded CREATED before either one commits.  The status predicate
+    # makes the database elect exactly one starter, including on SQLite where
+    # there is no row-level ``SELECT FOR UPDATE`` to rely on.
+    claim = cast(
+        CursorResult[Any],
+        await session.execute(
+            sa.update(Investigation)
+            .where(
+                Investigation.id == investigation.id,
+                Investigation.status == InvestigationStatus.CREATED.value,
+            )
+            .values(status=InvestigationStatus.RUNNING.value)
+        ),
+    )
+    if claim.rowcount != 1:
+        await session.refresh(investigation)
         raise ConflictError(
             f"investigation is already {investigation.status}",
             detail={"status": investigation.status},
         )
-
-    investigation.status = InvestigationStatus.RUNNING.value
     await session.commit()
 
     services.runner.submit(investigation.id)
@@ -451,8 +466,30 @@ async def retry_investigation(
             detail={"status": investigation.status},
         )
 
-    investigation.status = InvestigationStatus.RUNNING.value
-    investigation.error = None
+    claim = cast(
+        CursorResult[Any],
+        await session.execute(
+            sa.update(Investigation)
+            .where(
+                Investigation.id == investigation.id,
+                Investigation.status.in_(
+                    [
+                        InvestigationStatus.FAILED.value,
+                        InvestigationStatus.HALTED.value,
+                        InvestigationStatus.PARTIAL.value,
+                    ]
+                ),
+            )
+            .values(status=InvestigationStatus.RUNNING.value, error=None)
+        ),
+    )
+    if claim.rowcount != 1:
+        await session.refresh(investigation)
+        raise ConflictError(
+            "only failed, partial, or halted investigations can be retried; "
+            f"current status is {investigation.status}",
+            detail={"status": investigation.status},
+        )
     await session.commit()
 
     services.runner.submit(investigation.id)

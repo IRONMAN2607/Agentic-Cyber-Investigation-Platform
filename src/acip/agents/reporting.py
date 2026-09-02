@@ -12,6 +12,7 @@ when it did not.
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 from typing import Any, ClassVar
 
 import sqlalchemy as sa
@@ -162,7 +163,7 @@ class ReportAgent(Agent):
         self._section_evidence(add, evidence)
         self._section_risk(add, assessment)
         self._section_trace(add, agent_runs, tool_runs)
-        self._section_limitations(add, findings)
+        self._section_limitations(add, ctx, findings)
 
         return "\n".join(lines).rstrip() + "\n"
 
@@ -219,16 +220,17 @@ class ReportAgent(Agent):
         add("")
         add(f"- Investigation: `{ctx.investigation.display_id}`")
         add(f"- Created: {ctx.investigation.created_at.isoformat()}")
+        add(f"- Retention policy: `{ctx.investigation.retention_state}`")
         add(f"- Evidence items collected: {len(evidence)}")
         add(f"- Artifacts submitted: {len(ctx.artifacts)}")
         add("")
         if ctx.artifacts:
-            add("| Artifact | Declared kind | Size (bytes) | SHA-256 |")
-            add("| --- | --- | --- | --- |")
+            add("| Artifact | Declared kind | Retention | Size (bytes) | SHA-256 |")
+            add("| --- | --- | --- | --- | --- |")
             for artifact in ctx.artifacts:
                 add(
-                    f"| `{artifact.display_id}` | {artifact.kind} | {artifact.size_bytes} "
-                    f"| `{artifact.sha256}` |"
+                    f"| `{artifact.display_id}` | {artifact.kind} | {artifact.retention_state} "
+                    f"| {artifact.size_bytes} | `{artifact.sha256}` |"
                 )
             add("")
             add(
@@ -402,8 +404,36 @@ class ReportAgent(Agent):
                 add(f"- `{f_run.tool_name}`: {_cell(f_run.error or 'unknown error')}")
             add("")
 
-    def _section_limitations(self, add: Any, findings: list[Finding]) -> None:
+    def _section_limitations(self, add: Any, ctx: AgentContext, findings: list[Finding]) -> None:
         add("## 9. Limitations and Unknowns")
+        add("")
+        add("**Raw artifact retention and source bytes.**")
+        add("")
+        add(f"- Investigation retention policy: `{ctx.investigation.retention_state}`")
+        if ctx.artifacts:
+            missing_artifacts: list[Any] = []
+            intact_artifacts: list[Any] = []
+            for art in ctx.artifacts:
+                if not art.storage_path or not Path(art.storage_path).is_file():
+                    missing_artifacts.append(art)
+                else:
+                    intact_artifacts.append(art)
+
+            if missing_artifacts:
+                for art in missing_artifacts:
+                    add(
+                        f"- Source bytes for `{art.display_id}` (`{_cell(art.original_filename)}`, "
+                        f"SHA-256 `{art.sha256}`) are missing from storage "
+                        f"(retention: `{art.retention_state}`). Conclusions rely on derived "
+                        "evidence records rather than verifiable raw source bytes."
+                    )
+            if intact_artifacts:
+                add(
+                    f"- Source bytes are intact and verified in local storage for "
+                    f"{len(intact_artifacts)} submitted artifact(s)."
+                )
+        else:
+            add("- No raw artifacts were submitted for this investigation.")
         add("")
         add("**Recorded evidence gaps.**")
         add("")

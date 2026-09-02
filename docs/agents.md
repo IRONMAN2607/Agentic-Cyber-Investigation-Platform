@@ -73,13 +73,15 @@ queryable after the fact — it is the research dataset ([experiments.md](experi
 
 ## 3. Orchestration
 
-`Orchestrator.execute()` runs a plan task by task. Each task spans three short transactions:
+`OrchestratorAgent.execute()` coordinates the full investigation lifecycle:
 
-1. Insert the `AgentRun` as `running` and **commit** — the attempt is durable, so a crash mid-task
-   leaves visible evidence it was tried.
-2. Run the agent. Commit on success; **roll back on failure**, discarding partial evidence and tool
-   rows from the failing task. Partial output from a failed tool must not become citable evidence.
-3. Update the `AgentRun` with its outcome and commit.
+1. **State initialization**: `InvestigationState` tracks in-memory and durable lifecycle state, timestamps, active tasks, triage output, and error conditions.
+2. **Initial Triage execution**: Runs `t1-triage` to extract IOCs, entities, initial severity, and structured proposals (`TriageAnalysis`).
+3. **Structured interpretation & task creation**: `interpret_triage_result()` parses `TriageAnalysis`, maps proposed tasks to registered capabilities in `AgentRegistry`, records notes for unavailable tools, and persists `TaskRun` rows (`PENDING`).
+4. **Task execution**: Runs each planned task (`log_analysis`, `reporting`, etc.) across three short transactions:
+   - Insert `AgentRun` and update `TaskRun` as `running` and commit.
+   - Run the agent. Commit on success; **roll back on failure**, discarding partial ungrounded evidence.
+   - Update `AgentRun` and `TaskRun` with outcome, metrics, duration, and commit.
 
 **Restart recovery.** This durable trace is not durable execution. On API startup, Phase 1′ recovery
 marks unfinished `queued`/`running` investigations and agent runs as `interrupted`, writes an audit
@@ -149,7 +151,8 @@ investigation or silently skipping work.
 
 | Agent | Capability | Does |
 |---|---|---|
-| `triage` | `TRIAGE` | Classifies the submission, extracts IOCs, inventories entities, estimates initial severity |
+| `orchestrator` | `ORCHESTRATION` | Coordinates investigation lifecycle, executes triage, interprets structured results, schedules tasks, maintains state |
+| `triage` | `TRIAGE` | Classifies the submission, extracts IOCs, inventories entities, estimates initial severity, proposes task plan |
 | `log_analysis` | `LOG_ANALYSIS` | Runs `auth_log_parser`, applies deterministic detection rules, records auth findings |
 | `reporting` | `REPORTING` | Renders the report from stored records; computes the risk roll-up |
 

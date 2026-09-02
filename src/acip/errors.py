@@ -36,6 +36,11 @@ class ValidationError(ACIPError):
     code = "validation_error"
 
 
+class SSRFProtectionError(ValidationError):
+    status_code = 400
+    code = "ssrf_blocked"
+
+
 class AuthenticationError(ACIPError):
     status_code = 401
     code = "authentication_failed"

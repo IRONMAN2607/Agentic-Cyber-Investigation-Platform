@@ -308,7 +308,12 @@ class Finding(Base):
 
 
 class FindingEvidence(Base):
-    """Relational citation mapping evidence to findings with support/contradict roles."""
+    """Phase 5 schema scaffolding: relational citation mapping evidence to findings.
+
+    Present in the database schema to support future relational graph traversal in
+    Phase 5. Its presence is schema scaffolding and does not count as feature
+    implementation in M1/Phase 1'.
+    """
 
     __tablename__ = "finding_evidence"
     __table_args__ = (
@@ -331,7 +336,12 @@ class FindingEvidence(Base):
 
 
 class Hypothesis(Base):
-    """A competing candidate explanation, requiring a refutation condition (G3)."""
+    """Phase 7 schema scaffolding: competing candidate explanation requiring refutation (G3).
+
+    Present in the database schema for future hypothesis generation and testing
+    agents in Phase 7. Its presence is schema scaffolding outside M1 milestone
+    completion.
+    """
 
     __tablename__ = "hypotheses"
 
@@ -361,7 +371,7 @@ class Hypothesis(Base):
 
 
 class HypothesisEvidence(Base):
-    """Relational citation linking evidence to a hypothesis."""
+    """Phase 7 schema scaffolding: relational citation linking evidence to a hypothesis."""
 
     __tablename__ = "hypothesis_evidence"
     __table_args__ = (
@@ -384,7 +394,7 @@ class HypothesisEvidence(Base):
 
 
 class HypothesisGap(Base):
-    """Missing evidence or tool capability needed to decide a hypothesis."""
+    """Phase 7 schema scaffolding: declared missing evidence or tool capability."""
 
     __tablename__ = "hypothesis_gaps"
 
@@ -399,12 +409,13 @@ class HypothesisGap(Base):
 
 
 class ModelExecution(Base):
-    """Audited execution trace of any LLM invocation (append-only research dataset).
+    """Phase 6 schema scaffolding: audited execution trace of LLM invocations.
 
     Provenance foreign keys are ``RESTRICT`` for the same reason as
     :class:`Evidence`: this table is append-only, so it must not be destroyed or
     have its provenance erased as a side effect of deleting a parent row. Empty
-    until Phase 6 introduces the first model call.
+    until Phase 6 introduces the first model call. Its presence in the schema is
+    scaffolding and does not count as feature implementation in M1/Phase 1'.
     """
 
     __tablename__ = "llm_calls"

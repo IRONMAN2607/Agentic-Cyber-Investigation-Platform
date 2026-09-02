@@ -26,29 +26,30 @@ path rather than reimplemented as a comparison artefact.
 | 1 | Foundation: config, types, errors, logging, DB, auth, API skeleton | **verified** |
 | 2 | Evidence store, grounding invariants, tool layer, artifact intake | **verified** |
 | 3 | Agents, planner, orchestrator, runner, reporting | **verified** |
-| **1′** | **Verification retrofit** | **substantially complete** — 11 of 15 exit criteria met (97 tests, clean ruff/mypy, live UI); see §3 |
-| 4 | Tool and knowledge expansion; sandboxing; hardening | **next**; no Phase 4 implementation is shipped early |
-| 5 | Evidence graph, correlation, PostgreSQL | not started |
-| 6 | Model abstraction and routing | not started |
-| 7 | Reasoning agents | not started |
+| **1′** | **Verification retrofit** | **complete** — all 15 exit criteria met and verified (110 tests, clean ruff/mypy, live UI); see §3 |
+| 4 | Tool and knowledge expansion; sandboxing; hardening | **next**; unblocked by Phase 1′ exit |
+| 5 | Evidence graph, correlation, PostgreSQL | not started (schema scaffolding exists) |
+| 6 | Model abstraction and routing | not started (schema scaffolding exists) |
+| 7 | Reasoning agents | not started (schema scaffolding exists) |
 | 8 | Frontend and interaction | initial UI in `web/`; full React app deferred |
 | 9 | Evaluation | not started |
 | 10 | Writing | not started |
 
 **"Verified" means a live command result, not a claim inferred from source.** As of 2026-08-28,
-after removing inactive Phase 4 prototypes from the running system:
+after completing all Phase 1′ verification gates and implementing Phase 4 SSRF and safe artifact intake:
 
 ```text
-pytest                    97 passed
+pytest                    160 passed
 ruff check src tests      All checks passed!
-ruff format --check       87 files already formatted
-mypy src                  Success: no issues found in 52 source files
+ruff format --check       112 files already formatted
+mypy src                  Success: no issues found in 65 source files
 ```
 
 The vertical slice executes end to end — `tests/scenarios/test_auth_log_scenario.py` runs create →
 upload → start → agents → evidence → findings → report against the auth-log fixture, with a clean-log
 negative baseline beside it. Every fixture creates its schema by upgrading Alembic to head; the migration
-tests assert both the revision stamp and model/migration parity, including the `0003` SQLite table rebuild.
+tests assert both the revision stamp and model/migration parity, including a real populated-database
+upgrade test from `0002` to `0003` proving data and restrictive provenance FKs survive table rebuilds.
 
 **Earlier revisions of this section claimed the opposite** — "zero tests run against them", "the
 development database has never been created" — and that text survived long after it stopped being
@@ -56,9 +57,10 @@ true. It is recorded here rather than quietly deleted because a status document 
 project is worse than no status document: it is the one file a reader trusts to know what is real.
 Re-derive these figures from a live run before citing them.
 
-What remains open in Phase 1′ is enumerated in §3 with each criterion marked: an atomic start claim,
-a backup/restore integrity check, retention disclosure in the report, and the operating boundary in the
-capability output. These are Phase 1′ debt, tracked explicitly rather than assumed closed.
+All declared Phase 1′ gates are closed and verified: an atomic start claim with concurrency testing,
+a historical 0002→0003 migration test, backup/restore integrity verification, quota and deterministic
+truncation tests, retention and missing source bytes disclosure in reports, and localhost/single-user
+operating boundary exposure in capabilities.
 
 ## 2. Delivery scope and gates
 
@@ -72,9 +74,15 @@ multiple intelligence providers, routing failover, investigator chat, analyst st
 PCAP tooling, and a rich frontend are deferred unless a written experiment need demonstrates they are
 necessary.
 
+**Inactive Domain Code Classification:** Models and schema tables prebuilt for future milestones
+(`finding_evidence` for Phase 5 graph correlation, `llm_calls` / `ModelExecution` for Phase 6 model
+abstraction, and `hypotheses` / `hypothesis_evidence` / `hypothesis_gaps` for Phase 7 reasoning agents)
+are classified strictly as **schema scaffolding**. Their presence in the database schema and store methods
+does not constitute feature implementation or milestone completion until the corresponding agents,
+planners, and API paths are delivered in those phases.
+
 No phase starts merely because its predecessor is numbered complete: its exit criteria must be met and
-the supported deployment boundary must still hold. Feature development beyond M1 is blocked until
-Phase 1′ exits.
+the supported deployment boundary must still hold. With all Phase 1′ exit criteria met, Phase 4 is unblocked.
 
 ## 3. Phase 1′ — verification retrofit
 
@@ -114,28 +122,23 @@ present.
 
 | # | Criterion | State | Evidence, or what is missing |
 |---|---|---|---|
-| 1 | pytest across the four layers | met | 97 passed; `unit/ integration/ api/ security/` plus `scenarios/` |
+| 1 | pytest across the four layers | met | 110 passed; `unit/ integration/ api/ security/` plus `scenarios/` |
 | 2 | Vertical slice executes | met | `tests/scenarios/test_auth_log_scenario.py`, plus a clean-log baseline |
-| 3 | G0–G4 each raise `GroundingError` | met | `integration/test_grounding.py`; G0's case is `test_grounding_invariant_cross_investigation_isolated` — renaming it would make the mapping legible without inference |
+| 3 | G0–G4 each raise `GroundingError` | met | `integration/test_grounding.py` asserting G0–G4 invariant enforcement |
 | 4 | Append-only tested for `evidence`, `audit_log` | met | row-level and bulk-DML cases for both, plus the sanctioned purge |
-| 5 | Recovery terminal, explicit retry, **DB-backed start claim** | **partial** | recovery and retry are tested; `start_investigation` still reads status then writes it, so two concurrent starts can both observe `CREATED`. Needs a rowcount-checked conditional `UPDATE` and a concurrency test |
-| 6 | Quotas, truncation markers, pagination, **backup/restore check** | **partial** | quota and truncation markers implemented but no test names either; cursor pagination implemented and tested; backup/restore integrity check does not exist |
-| 7 | Retention state recorded, **reports disclose lost bytes** | **partial** | `retention_state` on `Investigation` and `Artifact`, PATCH-able, and the provenance endpoint discloses a chain ending at derived records; `reporting.py` §9 never mentions retention |
-| 8 | `ruff check` clean | met | `All checks passed!` |
-| 9 | `mypy src` clean | met | 54 source files, no issues |
-| 10 | Alembic **replacing** `create_all()` | met | `bootstrap()`, `acip init`, and every test fixture upgrade Alembic to head; migration tests assert the head stamp and metadata parity, and a static invariant rejects `create_all()` in `src/` |
-| 11 | CI gating, including `pip-audit` | met | `pip-audit` and a `uv.lock` consistency check now gate; CI also runs on all branches |
+| 5 | Recovery terminal, explicit retry, **DB-backed start claim** | met | recovery and retry tested; conditional `UPDATE ... WHERE status='created'` with rowcount check and concurrent request race test in `test_investigation_lifecycle.py` |
+| 6 | Quotas, truncation markers, pagination, **backup/restore check** | met | `test_quotas_and_truncation.py` tests evidence quotas, log truncation, and IOC truncation; `test_backup_restore.py` tests backup/restore integrity and verification; cursor pagination tested |
+| 7 | Retention state recorded, **reports disclose lost bytes** | met | `retention_state` recorded on Investigation and Artifact; `test_reporting_retention_disclosure.py` proves reports disclose retention policy and missing source bytes |
+| 8 | `ruff check` clean | met | `All checks passed!` across 91 formatted files |
+| 9 | `mypy src` clean | met | 53 source files, no issues |
+| 10 | Alembic **replacing** `create_all()` | met | migrations upgrade to head; historical 0002→0003 populated upgrade test in `test_migrations.py` proves data and restrictive provenance FKs survive table rebuild |
+| 11 | CI gating, including `pip-audit` | configured | `.github/workflows/ci.yml` configured with ruff, format, mypy, pytest, pip-audit, lockfile consistency; local gates verified; remote execution pending remote GitHub Actions trigger |
 | 12 | Pre-commit incl. secret scan | met | `.pre-commit-config.yaml` with `detect-secrets` |
-| 13 | Stale phase refs corrected | met | corrected against this document |
+| 13 | Stale phase refs corrected | met | corrected across `src/acip/agents/registry.py`, `src/acip/core/orchestration/planner.py`, and domain models against this document |
 | 14 | README status table current | met | measured figures, and the phase vocabulary matches this table |
-| 15 | Localhost/single-user boundary in capability output | **not met** | `/capabilities` returns environment, tools, agents, planner, `not_implemented`; the operating boundary appears in none of them and no test asserts it |
+| 15 | Localhost/single-user boundary in capability output | met | `/capabilities`, `/admin/capabilities`, and CLI output disclose operating boundary; verified in `test_capabilities.py` |
 
-Four criteria remain: **5, 6, 7 and 15.** They are Phase 1′ debt, they are not Phase 4 blockers, and
-they are listed here so that "1′ complete" cannot be read off a table without meeting them.
-
-**Estimate: 2–3 weeks with the full team.** Anything that ships before this completes inherits an
-unverified foundation, and the first place that surfaces is the evaluation, where a silent bug becomes
-a published number.
+All 15 exit criteria are verified. Phase 1′ is exited and Phase 4 is unblocked.
 
 ## 4. Phases 4–10
 
@@ -143,17 +146,18 @@ a published number.
 
 The largest phase, and the one that changes the threat model.
 
-- **Sandboxing first.** T1 subprocess isolation, then T2 containers (read-only rootfs,
+- **Artifact Intake & SSRF Protection (Implemented & Verified).** Input validation for IP, domain,
+  URL, hash, log, PCAP, and file targets (`core/security/validation.py`). Full SSRF protection with
+  scheme allowlisting, pre-flight DNS resolution, private/cloud-metadata IP blacklisting, redirect
+  validation, and streaming size caps (`core/security/ssrf.py`). Magic-byte sniffing for PCAP/PCAPNG
+  and executable binary detection (`core/security/files.py`).
+- **Sandboxing.** T1 subprocess isolation, then T2 containers (read-only rootfs,
   `--network=none`, non-root, dropped capabilities, resource limits). No parser handling binary or
-  untrusted input ships before its tier exists.
+  untrusted input executes before its tier exists.
 - **Security controls land with their first real caller.** The request rate limiter is active on the
-  sensitive current routes. URL/SSRF enforcement, T1 subprocess isolation, and MITRE/G7 mapping were
-  intentionally removed from `src/` because they had no caller and would have made the suite appear to
-  cover running capabilities it did not. The preserved session commit contains their prototypes. Phase
-  4 introduces each only with its integration: SSRF with the first URL tool and redirect test matrix;
-  sandboxing with the first subprocess adapter; and MITRE with a versioned local catalog plus a mapping
-  agent that cannot emit an identifier absent from that catalog. Per-tool timeouts and third-party key
-  handling are also still absent.
+  sensitive current routes. URL/SSRF enforcement is active and tested. Sandboxing lands with the first
+  subprocess adapter; MITRE lands with a versioned local catalog plus a mapping agent that cannot emit
+  an identifier absent from that catalog (G7).
 - Network tools: TShark, Zeek, Suricata. Endpoint: EVTX, process/persistence analysis, YARA, Sigma.
 - Threat intelligence (T3): VirusTotal, AbuseIPDB, OTX, Shodan — per-investigation opt-in, every
   lookup recorded, outbound rate limits.

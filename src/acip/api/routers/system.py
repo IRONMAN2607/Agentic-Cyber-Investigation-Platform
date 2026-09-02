@@ -22,7 +22,7 @@ from acip.api.schemas import (
     HealthResponse,
     ToolCapability,
 )
-from acip.core.limitations import NOT_IMPLEMENTED
+from acip.core.limitations import OPERATING_BOUNDARY, get_not_implemented
 from acip.logging import get_logger
 
 logger = get_logger(__name__)
@@ -55,7 +55,8 @@ async def capabilities(
         tools=services.tools.names(),
         agents=services.agents.names(),
         planner=services.planner.name,
-        not_implemented=list(NOT_IMPLEMENTED),
+        not_implemented=get_not_implemented(services.settings),
+        operating_boundary=OPERATING_BOUNDARY,
     )
 
 
@@ -79,5 +80,6 @@ async def admin_capabilities(
         ],
         agents=[AgentCapabilityInfo(**info) for info in services.agents.describe()],
         planner=services.planner.name,
-        not_implemented=list(NOT_IMPLEMENTED),
+        not_implemented=get_not_implemented(services.settings),
+        operating_boundary=OPERATING_BOUNDARY,
     )

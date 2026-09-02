@@ -118,13 +118,23 @@ class TargetType(StrEnum):
 
 
 class ArtifactKind(StrEnum):
-    """Declared kind of an uploaded artifact.
+    """Declared or detected kind of an uploaded or ingested artifact.
 
-    Declared by the client and treated as untrusted: tool adapters validate
-    content themselves rather than relying on this value.
+    Declared by the client and treated as untrusted: intake sanitizers and tool
+    adapters validate content headers and magic bytes directly.
     """
 
     LINUX_AUTH_LOG = "linux_auth_log"
+    SYS_LOG = "syslog"
+    WEB_SERVER_LOG = "web_server_log"
+    GENERIC_LOG = "generic_log"
+    PCAP = "pcap"
+    PCAP_NG = "pcapng"
+    URL_RESPONSE = "url_response"
+    URL = "url"
+    IP = "ip"
+    HASH = "hash"
+    BINARY_FILE = "binary_file"
     GENERIC_TEXT = "generic_text"
     UNKNOWN = "unknown"
 
@@ -180,6 +190,7 @@ class AgentCapability(StrEnum):
     REPORTING = "reporting"
     HYPOTHESIS = "hypothesis"
     VALIDATION = "validation"
+    ORCHESTRATION = "orchestration"
 
 
 class RetentionState(StrEnum):
@@ -214,3 +225,20 @@ class FinishReason(StrEnum):
     TOOL_CALLS = "tool_calls"
     CONTENT_FILTER = "content_filter"
     ERROR = "error"
+
+
+class TaskClass(StrEnum):
+    """Abstract classification of an LLM task.
+
+    Agents request a task class rather than a model identifier. The ModelRouter
+    resolves candidates and fallback chains based on configuration.
+    """
+
+    PLANNING = "planning"
+    EXTRACTION = "extraction"
+    CLASSIFICATION = "classification"
+    CORRELATION = "correlation"
+    HYPOTHESIS = "hypothesis"
+    VALIDATION = "validation"
+    NARRATIVE = "narrative"
+    CHAT = "chat"

@@ -45,8 +45,8 @@ central rule and rewriting it would discard sound work. Phase 1′ (see
 ┌───────────────────────────▼──────────────────────────────────┐
 │  Orchestration                                               │
 │  InvestigationRunner (bounded concurrency)                   │
-│  Orchestrator (executes plan, writes execution trace)        │
-│  Planner  ◄── static | LLM-backed (swappable, Phase 7)       │
+│  OrchestratorAgent (coordinates lifecycle, interprets triage)│
+│  Planner  ◄── dynamic | static | LLM-backed (Phase 7)        │
 └───────────────────────────┬──────────────────────────────────┘
                             │ AgentContext / AgentResult
 ┌───────────────────────────▼──────────────────────────────────┐
@@ -226,8 +226,9 @@ authenticate → create investigation → upload Linux auth.log
   → deterministic risk roll-up → report generated → API serves it
 ```
 
-The code for this exists. **It has never been run.** M1 is therefore not complete, and completing
-it — with tests, and with the slice actually executed — is the first task of Phase 1′. See
+The code for this exists and is **verified by automated tests**. M1 executes
+end-to-end against live and baseline log fixtures in `tests/scenarios/test_auth_log_scenario.py`,
+with full test coverage across unit, integration, API, and security suites. See
 [roadmap.md](roadmap.md) and the definition of done in [testing.md](testing.md).
 
 ## 7. Related documents
