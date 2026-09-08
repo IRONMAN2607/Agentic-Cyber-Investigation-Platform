@@ -24,10 +24,42 @@
       throw new Error("Session expired. Please log in.");
     }
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error(err.message || "Request failed");
+      let errMsg = res.statusText || "Request failed";
+      try {
+        const text = await res.text();
+        if (text && text.trim()) {
+          try {
+            const err = JSON.parse(text);
+            if (err.message) {
+              errMsg = err.message;
+            } else if (typeof err.detail === "string") {
+              errMsg = err.detail;
+            } else if (Array.isArray(err.detail)) {
+              errMsg = err.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+            } else if (err.detail) {
+              errMsg = typeof err.detail === "object" ? JSON.stringify(err.detail) : String(err.detail);
+            }
+          } catch {
+            errMsg = text;
+          }
+        }
+      } catch {
+        // Ignore body read errors on error responses
+      }
+      throw new Error(errMsg);
     }
-    return res.json();
+    if (res.status === 204 || res.status === 205 || res.headers.get("content-length") === "0") {
+      return null;
+    }
+    const text = await res.text();
+    if (!text || !text.trim()) {
+      return null;
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
   }
 
   // --- Auth State ---
@@ -438,6 +470,10 @@
     }
     try {
       await api(`/investigations/${invId}?purge=true`, { method: "DELETE" });
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
       currentInvId = null;
       showToast("Investigation and evidence purged", "info");
       document.getElementById("workspace-view").innerHTML = `<div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">Investigation deleted. Select another from the sidebar or click <strong>+ New</strong>.</div>`;

@@ -1,7 +1,7 @@
 # Graph Report - AACIP  (2026-09-03)
 
 ## Corpus Check
-- 144 files · ~84,354 words
+- 144 files · ~84,477 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `37acdf70`
+- Built from commit: `a98bdd85`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,7 +37,7 @@
 - types.py
 - InvestigationStatus
 - CLAUDE.md
-- bootstrap.py
+- auth.py
 - Services
 - agentrouter
 - ArtifactKind
@@ -48,7 +48,7 @@
 - app.js
 - env.py
 - Three-Transaction Orchestrator
-- test_migrations.py
+- migrate.py
 - ToolAdapter Base Contract
 - auth_log_parser Tool
 - Argon2id and HS256 JWT Security
@@ -242,9 +242,9 @@ Nodes (35): Mapped, ModelExecutionDraft, Evidence and finding contracts. Agents 
 Cohesion: 0.17
 Nodes (21): Investigator, cancel_investigation(), create_investigation(), ingest_text_artifact(), ingest_url_artifact(), post, Ingest content from a remote URL via SSRF-protected safe HTTP fetch., Ingest raw text/log/indicator directly into quarantine storage. (+13 more)
 
-### Community 22 - "bootstrap.py"
+### Community 22 - "auth.py"
 Cohesion: 0.11
-Nodes (24): Config, bootstrap(), Application bootstrap. Migrates the schema to head and, outside production,…, Prepare storage and seed development data., Create the bootstrap admin if it does not already exist. Returns ``None`` when…, seed_admin(), hash_password(), needs_rehash() (+16 more)
+Nodes (21): Logger, me(), CurrentUser, get, Authentication endpoints., Application bootstrap. Migrates the schema to head and, outside production,…, Create the bootstrap admin if it does not already exist. Returns ``None`` when…, seed_admin() (+13 more)
 
 ### Community 23 - "Services"
 Cohesion: 0.11
@@ -286,9 +286,9 @@ Nodes (8): do_run_migrations(), Connection, Run migrations in 'offline' mode., I
 Cohesion: 0.33
 Nodes (6): Three-Transaction Orchestrator, Decision: Custom Asyncio Orchestration, Append-Only Table Enforcement, Content-Addressed Storage and In-Stream Size Enforcement, Security Controls Matrix (16 Controls), Assets and Adversary Taxonomy (A1-A6)
 
-### Community 33 - "test_migrations.py"
-Cohesion: 0.24
-Nodes (10): _current_revision(), Connection, The migration chain is the schema, so the suite runs on it. Every fixture…, The fixture's schema came from Alembic, not from ``create_all``., ``Base.metadata`` describes exactly what the migrations build., A second engine on ``:memory:`` would migrate a different database., _schema_diff(), test_bootstrap_stamps_the_database_at_head() (+2 more)
+### Community 33 - "migrate.py"
+Cohesion: 0.12
+Nodes (21): Config, model_validator, Require a real secret in production; generate an ephemeral one otherwise. A…, alembic_config(), Connection, Schema creation, through Alembic and only through Alembic. The migration chain…, Build an Alembic config without reading ``alembic.ini``. The ini file carries a…, Bring the database at ``url`` up to ``revision``, creating it if absent. (+13 more)
 
 ### Community 34 - "ToolAdapter Base Contract"
 Cohesion: 0.40
@@ -423,7 +423,7 @@ Cohesion: 0.10
 Nodes (44): Deterministic rule-based triage used when model router is unavailable., EvidenceGap, ExtractedEntity, IndicatorAssessment, InputClassification, PlannedTaskProposal, BaseModel, Structured output schemas for the Triage Agent. (+36 more)
 
 ### Community 105 - "Settings"
-Cohesion: 0.13
+Cohesion: 0.15
 Nodes (16): BaseSettings, RequestValidationError, create_app(), _install_error_handlers(), FastAPI, FastAPI application factory. ``create_app`` takes optional settings and…, Strip non-JSON values (e.g. uploaded bytes, exception objects in ctx) out of…, _serialisable_errors() (+8 more)
 
 ### Community 106 - "orchestration/orchestrator.py"
@@ -431,8 +431,8 @@ Cohesion: 0.06
 Nodes (57): Orchestrator Agent. Re-exports the core OrchestratorAgent, state tracking, and…, Investigation planning and orchestration., _derive_status(), InvestigationOutcome, InvestigationState, _load_artifacts(), _load_investigation(), OrchestratorAgent (+49 more)
 
 ### Community 108 - "logging.py"
-Cohesion: 0.11
-Nodes (17): Logger, LogRecord, me(), CurrentUser, get, Authentication endpoints., Audit trail writes. Security-relevant actions are recorded in an append-only…, Background execution of investigations. M1 runs investigations as asyncio tasks… (+9 more)
+Cohesion: 0.21
+Nodes (9): LogRecord, _coerce(), ConsoleFormatter, ContextFilter, JSONFormatter, Structured logging with investigation correlation. Every log record emitted…, Merge the ambient context into each record., One JSON object per line, suitable for ingestion by a log pipeline. (+1 more)
 
 ### Community 110 - "HypothesisDraft"
 Cohesion: 0.22
@@ -484,9 +484,9 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `EvidenceStore` connect `EvidenceStore` to `Database`, `get_session`, `_evidence_after`, `_build_chain`, `investigations.py`, `Investigation`, `AgentContext`, `orchestration/orchestrator.py`, `triage.py`, `HypothesisDraft`, `types.py`, `Evidence`, `tools/runner.py`, `test_historical_migration_0002_to_0003_populated_upgrade`, `Severity`?**
   _High betweenness centrality (0.051) - this node is a cross-community bridge._
-- **Why does `Settings` connect `Settings` to `test_migrations.py`, `InvestigationRunner`, `backup.py`, `test_investigation_lifecycle.py`, `Investigation`, `AgentContext`, `ValueError`, `orchestration/orchestrator.py`, `test_capabilities.py`, `test_orchestrator_agent_with_model_router_triage`, `triage.py`, `conftest.py`, `cli.py`, `AgentResult`, `bootstrap.py`, `Services`, `deps.py`?**
+- **Why does `Settings` connect `Settings` to `migrate.py`, `InvestigationRunner`, `backup.py`, `test_investigation_lifecycle.py`, `Investigation`, `AgentContext`, `ValueError`, `orchestration/orchestrator.py`, `test_capabilities.py`, `test_orchestrator_agent_with_model_router_triage`, `triage.py`, `conftest.py`, `cli.py`, `AgentResult`, `auth.py`, `Services`, `deps.py`?**
   _High betweenness centrality (0.048) - this node is a cross-community bridge._
-- **Why does `Role` connect `Role` to `EntityRef`, `investigations.py`, `test_investigation_lifecycle.py`, `ValueError`, `test_capabilities.py`, `ratelimit.py`, `conftest.py`, `test_auth_log_incident_scenario`, `tokens.py`, `cli.py`, `types.py`, `test_auth.py`, `test_investigation_crud_and_lifecycle`, `bootstrap.py`, `test_upload_security.py`, `test_types.py`, `test_artifact_ingestion_api.py`, `deps.py`?**
+- **Why does `Role` connect `Role` to `EntityRef`, `investigations.py`, `test_investigation_lifecycle.py`, `ValueError`, `test_capabilities.py`, `ratelimit.py`, `conftest.py`, `test_auth_log_incident_scenario`, `tokens.py`, `cli.py`, `types.py`, `test_auth.py`, `test_investigation_crud_and_lifecycle`, `auth.py`, `test_upload_security.py`, `test_types.py`, `test_artifact_ingestion_api.py`, `deps.py`?**
   _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **Are the 54 inferred relationships involving `Database` (e.g. with `build_services()` and `Services`) actually correct?**
   _`Database` has 54 INFERRED edges - model-reasoned connections that need verification._

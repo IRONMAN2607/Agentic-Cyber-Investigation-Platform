@@ -1027,19 +1027,6 @@
       "source_location": "L21"
     },
     {
-      "id": "src_acip_errors_configurationerror",
-      "label": "ConfigurationError",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "code",
-      "norm_label": "configurationerror",
-      "source_file": "src/acip/errors.py",
-      "source_location": "L25"
-    },
-    {
       "id": "src_acip_api_deps_services",
       "label": "Services",
       "_callable": true,
@@ -1337,6 +1324,19 @@
       "norm_label": "timeconfidence",
       "source_file": "src/acip/types.py",
       "source_location": "L96"
+    },
+    {
+      "id": "src_acip_errors_configurationerror",
+      "label": "ConfigurationError",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "configurationerror",
+      "source_file": "src/acip/errors.py",
+      "source_location": "L25"
     },
     {
       "id": "src_acip_core_orchestration_runner_investigationrunner",
@@ -2838,6 +2838,18 @@
       "source_location": "L178"
     },
     {
+      "id": "src_acip_bootstrap_bootstrap",
+      "label": "bootstrap()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 105,
+      "community_name": "Settings",
+      "file_type": "code",
+      "norm_label": "bootstrap()",
+      "source_file": "src/acip/bootstrap.py",
+      "source_location": "L26"
+    },
+    {
       "id": "src_acip_config_get_settings",
       "label": "get_settings()",
       "_callable": true,
@@ -2872,18 +2884,6 @@
       "norm_label": ".is_prod()",
       "source_file": "src/acip/config.py",
       "source_location": "L118"
-    },
-    {
-      "id": "src_acip_config_settings_validate_secret",
-      "label": "._validate_secret()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 105,
-      "community_name": "Settings",
-      "file_type": "code",
-      "norm_label": "._validate_secret()",
-      "source_file": "src/acip/config.py",
-      "source_location": "L98"
     },
     {
       "id": "src_acip_core_orchestration_orchestrator_derive_status",
@@ -3282,18 +3282,6 @@
       "source_location": "L35"
     },
     {
-      "id": "src_acip_api_routers_auth_me",
-      "label": "me()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "me()",
-      "source_file": "src/acip/api/routers/auth.py",
-      "source_location": "L92"
-    },
-    {
       "id": "src_acip_logging_coerce",
       "label": "_coerce()",
       "_callable": true,
@@ -3328,18 +3316,6 @@
       "norm_label": ".filter()",
       "source_file": "src/acip/logging.py",
       "source_location": "L52"
-    },
-    {
-      "id": "src_acip_logging_get_logger",
-      "label": "get_logger()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "get_logger()",
-      "source_file": "src/acip/logging.py",
-      "source_location": "L123"
     },
     {
       "id": "src_acip_logging_jsonformatter_format",
@@ -5058,16 +5034,16 @@
       "source_location": "L30"
     },
     {
-      "id": "src_acip_bootstrap_bootstrap",
-      "label": "bootstrap()",
+      "id": "src_acip_api_routers_auth_me",
+      "label": "me()",
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
-      "norm_label": "bootstrap()",
-      "source_file": "src/acip/bootstrap.py",
-      "source_location": "L26"
+      "norm_label": "me()",
+      "source_file": "src/acip/api/routers/auth.py",
+      "source_location": "L92"
     },
     {
       "id": "src_acip_bootstrap_seed_admin",
@@ -5075,7 +5051,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "seed_admin()",
       "source_file": "src/acip/bootstrap.py",
@@ -5087,7 +5063,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "hash_password()",
       "source_file": "src/acip/core/security/passwords.py",
@@ -5099,7 +5075,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "needs_rehash()",
       "source_file": "src/acip/core/security/passwords.py",
@@ -5111,47 +5087,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "verify_password()",
       "source_file": "src/acip/core/security/passwords.py",
       "source_location": "L30"
     },
     {
-      "id": "src_acip_db_migrate_alembic_config",
-      "label": "alembic_config()",
+      "id": "src_acip_logging_get_logger",
+      "label": "get_logger()",
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
-      "norm_label": "alembic_config()",
-      "source_file": "src/acip/db/migrate.py",
-      "source_location": "L51"
-    },
-    {
-      "id": "src_acip_db_migrate_upgrade",
-      "label": "_upgrade()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "code",
-      "norm_label": "_upgrade()",
-      "source_file": "src/acip/db/migrate.py",
-      "source_location": "L69"
-    },
-    {
-      "id": "src_acip_db_migrate_upgrade_to_head",
-      "label": "upgrade_to_head()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "code",
-      "norm_label": "upgrade_to_head()",
-      "source_file": "src/acip/db/migrate.py",
-      "source_location": "L75"
+      "norm_label": "get_logger()",
+      "source_file": "src/acip/logging.py",
+      "source_location": "L123"
     },
     {
       "id": "tests_unit_test_passwords_test_needs_rehash",
@@ -5159,7 +5111,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "test_needs_rehash()",
       "source_file": "tests/unit/test_passwords.py",
@@ -5171,7 +5123,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "test_password_hash_and_verify()",
       "source_file": "tests/unit/test_passwords.py",
@@ -5183,7 +5135,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "test_password_min_length_enforced()",
       "source_file": "tests/unit/test_passwords.py",
@@ -5195,7 +5147,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "test_verify_password_invalid_hash_safe()",
       "source_file": "tests/unit/test_passwords.py",
@@ -5739,7 +5691,7 @@
       "file_type": "code",
       "norm_label": "checkcurrentuser()",
       "source_file": "web/app.js",
-      "source_location": "L51"
+      "source_location": "L83"
     },
     {
       "id": "web_app_escapehtml",
@@ -5751,7 +5703,7 @@
       "file_type": "code",
       "norm_label": "escapehtml()",
       "source_file": "web/app.js",
-      "source_location": "L609"
+      "source_location": "L645"
     },
     {
       "id": "web_app_loadinvestigations",
@@ -5763,7 +5715,7 @@
       "file_type": "code",
       "norm_label": "loadinvestigations()",
       "source_file": "web/app.js",
-      "source_location": "L68"
+      "source_location": "L100"
     },
     {
       "id": "web_app_rendermarkdown",
@@ -5775,7 +5727,7 @@
       "file_type": "code",
       "norm_label": "rendermarkdown()",
       "source_file": "web/app.js",
-      "source_location": "L356"
+      "source_location": "L388"
     },
     {
       "id": "web_app_renderworkspace",
@@ -5787,7 +5739,7 @@
       "file_type": "code",
       "norm_label": "renderworkspace()",
       "source_file": "web/app.js",
-      "source_location": "L135"
+      "source_location": "L167"
     },
     {
       "id": "web_app_selectinvestigation",
@@ -5799,7 +5751,7 @@
       "file_type": "code",
       "norm_label": "selectinvestigation()",
       "source_file": "web/app.js",
-      "source_location": "L97"
+      "source_location": "L129"
     },
     {
       "id": "web_app_setauth",
@@ -5811,7 +5763,7 @@
       "file_type": "code",
       "norm_label": "setauth()",
       "source_file": "web/app.js",
-      "source_location": "L34"
+      "source_location": "L66"
     },
     {
       "id": "web_app_showlogin",
@@ -5823,7 +5775,7 @@
       "file_type": "code",
       "norm_label": "showlogin()",
       "source_file": "web/app.js",
-      "source_location": "L62"
+      "source_location": "L94"
     },
     {
       "id": "web_app_showtoast",
@@ -5835,7 +5787,7 @@
       "file_type": "code",
       "norm_label": "showtoast()",
       "source_file": "web/app.js",
-      "source_location": "L590"
+      "source_location": "L626"
     },
     {
       "id": "migrations_env_do_run_migrations",
@@ -5886,12 +5838,60 @@
       "source_location": "L64"
     },
     {
+      "id": "src_acip_config_settings_validate_secret",
+      "label": "._validate_secret()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "._validate_secret()",
+      "source_file": "src/acip/config.py",
+      "source_location": "L98"
+    },
+    {
+      "id": "src_acip_db_migrate_alembic_config",
+      "label": "alembic_config()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "alembic_config()",
+      "source_file": "src/acip/db/migrate.py",
+      "source_location": "L51"
+    },
+    {
+      "id": "src_acip_db_migrate_upgrade",
+      "label": "_upgrade()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "_upgrade()",
+      "source_file": "src/acip/db/migrate.py",
+      "source_location": "L69"
+    },
+    {
+      "id": "src_acip_db_migrate_upgrade_to_head",
+      "label": "upgrade_to_head()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "upgrade_to_head()",
+      "source_file": "src/acip/db/migrate.py",
+      "source_location": "L75"
+    },
+    {
       "id": "tests_integration_test_migrations_current_revision",
       "label": "_current_revision()",
       "_callable": true,
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "code",
       "norm_label": "_current_revision()",
       "source_file": "tests/integration/test_migrations.py",
@@ -5903,7 +5903,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "code",
       "norm_label": "_schema_diff()",
       "source_file": "tests/integration/test_migrations.py",
@@ -5915,7 +5915,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "code",
       "norm_label": "test_bootstrap_stamps_the_database_at_head()",
       "source_file": "tests/integration/test_migrations.py",
@@ -5927,7 +5927,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "code",
       "norm_label": "test_in_memory_is_refused_rather_than_silently_unmigrated()",
       "source_file": "tests/integration/test_migrations.py",
@@ -5939,7 +5939,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "code",
       "norm_label": "test_models_and_migrations_do_not_drift()",
       "source_file": "tests/integration/test_migrations.py",
@@ -9170,17 +9170,6 @@
       "source_location": "L1"
     },
     {
-      "id": "src_acip_config_py_model_validator",
-      "label": "model_validator",
-      "_origin": "ast",
-      "community": 105,
-      "community_name": "Settings",
-      "file_type": "code",
-      "norm_label": "model_validator",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "src_acip_api_app_rationale_1",
       "label": "FastAPI application factory. ``create_app`` takes optional settings and\u2026",
       "_origin": "ast",
@@ -9201,6 +9190,17 @@
       "norm_label": "strip non-json values (e.g. uploaded bytes, exception objects in ctx) out of...",
       "source_file": "src/acip/api/app.py",
       "source_location": "L179"
+    },
+    {
+      "id": "src_acip_bootstrap_rationale_27",
+      "label": "Prepare storage and seed development data.",
+      "_origin": "ast",
+      "community": 105,
+      "community_name": "Settings",
+      "file_type": "rationale",
+      "norm_label": "prepare storage and seed development data.",
+      "source_file": "src/acip/bootstrap.py",
+      "source_location": "L27"
     },
     {
       "id": "src_acip_config_rationale_1",
@@ -9245,17 +9245,6 @@
       "norm_label": "resolved application settings.",
       "source_file": "src/acip/config.py",
       "source_location": "L27"
-    },
-    {
-      "id": "src_acip_config_rationale_99",
-      "label": "Require a real secret in production; generate an ephemeral one otherwise. A\u2026",
-      "_origin": "ast",
-      "community": 105,
-      "community_name": "Settings",
-      "file_type": "rationale",
-      "norm_label": "require a real secret in production; generate an ephemeral one otherwise. a...",
-      "source_file": "src/acip/config.py",
-      "source_location": "L99"
     },
     {
       "id": "src_acip_agents_orchestrator",
@@ -9687,17 +9676,6 @@
       "source_location": "L42"
     },
     {
-      "id": "logger",
-      "label": "Logger",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "logger",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "logrecord",
       "label": "LogRecord",
       "_origin": "ast",
@@ -9709,72 +9687,6 @@
       "source_location": ""
     },
     {
-      "id": "src_acip_api_routers_auth",
-      "label": "auth.py",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "auth.py",
-      "source_file": "src/acip/api/routers/auth.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_api_routers_auth_py_currentuser",
-      "label": "CurrentUser",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "currentuser",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "src_acip_api_routers_auth_py_get",
-      "label": "get",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "get",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "src_acip_core_audit",
-      "label": "audit.py",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "audit.py",
-      "source_file": "src/acip/core/audit.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_core_init",
-      "label": "core/__init__.py",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "core/__init__.py",
-      "source_file": "src/acip/core/__init__.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_core_orchestration_runner",
-      "label": "orchestration/runner.py",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "code",
-      "norm_label": "orchestration/runner.py",
-      "source_file": "src/acip/core/orchestration/runner.py",
-      "source_location": "L1"
-    },
-    {
       "id": "src_acip_logging",
       "label": "logging.py",
       "_origin": "ast",
@@ -9783,39 +9695,6 @@
       "file_type": "code",
       "norm_label": "logging.py",
       "source_file": "src/acip/logging.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_api_routers_auth_rationale_1",
-      "label": "Authentication endpoints.",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "rationale",
-      "norm_label": "authentication endpoints.",
-      "source_file": "src/acip/api/routers/auth.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_core_audit_rationale_1",
-      "label": "Audit trail writes. Security-relevant actions are recorded in an append-only\u2026",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "rationale",
-      "norm_label": "audit trail writes. security-relevant actions are recorded in an append-only...",
-      "source_file": "src/acip/core/audit.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_core_orchestration_runner_rationale_1",
-      "label": "Background execution of investigations. M1 runs investigations as asyncio tasks\u2026",
-      "_origin": "ast",
-      "community": 108,
-      "community_name": "logging.py",
-      "file_type": "rationale",
-      "norm_label": "background execution of investigations. m1 runs investigations as asyncio tasks...",
-      "source_file": "src/acip/core/orchestration/runner.py",
       "source_location": "L1"
     },
     {
@@ -11669,13 +11548,46 @@
       "source_location": "L1"
     },
     {
-      "id": "config",
-      "label": "Config",
+      "id": "logger",
+      "label": "Logger",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
-      "norm_label": "config",
+      "norm_label": "logger",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_acip_api_routers_auth",
+      "label": "auth.py",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "code",
+      "norm_label": "auth.py",
+      "source_file": "src/acip/api/routers/auth.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_api_routers_auth_py_currentuser",
+      "label": "CurrentUser",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "code",
+      "norm_label": "currentuser",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_acip_api_routers_auth_py_get",
+      "label": "get",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "code",
+      "norm_label": "get",
       "source_file": "",
       "source_location": ""
     },
@@ -11684,10 +11596,43 @@
       "label": "bootstrap.py",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "bootstrap.py",
       "source_file": "src/acip/bootstrap.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_core_audit",
+      "label": "audit.py",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "code",
+      "norm_label": "audit.py",
+      "source_file": "src/acip/core/audit.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_core_init",
+      "label": "core/__init__.py",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "code",
+      "norm_label": "core/__init__.py",
+      "source_file": "src/acip/core/__init__.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_core_orchestration_runner",
+      "label": "orchestration/runner.py",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "code",
+      "norm_label": "orchestration/runner.py",
+      "source_file": "src/acip/core/orchestration/runner.py",
       "source_location": "L1"
     },
     {
@@ -11695,43 +11640,32 @@
       "label": "passwords.py",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "passwords.py",
       "source_file": "src/acip/core/security/passwords.py",
       "source_location": "L1"
     },
     {
-      "id": "src_acip_db_migrate",
-      "label": "migrate.py",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "code",
-      "norm_label": "migrate.py",
-      "source_file": "src/acip/db/migrate.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_db_migrate_py_connection",
-      "label": "Connection",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "code",
-      "norm_label": "connection",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "tests_unit_test_passwords",
       "label": "test_passwords.py",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "code",
       "norm_label": "test_passwords.py",
       "source_file": "tests/unit/test_passwords.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_api_routers_auth_rationale_1",
+      "label": "Authentication endpoints.",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "rationale",
+      "norm_label": "authentication endpoints.",
+      "source_file": "src/acip/api/routers/auth.py",
       "source_location": "L1"
     },
     {
@@ -11739,40 +11673,51 @@
       "label": "Application bootstrap. Migrates the schema to head and, outside production,\u2026",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "rationale",
       "norm_label": "application bootstrap. migrates the schema to head and, outside production,...",
       "source_file": "src/acip/bootstrap.py",
       "source_location": "L1"
     },
     {
-      "id": "src_acip_bootstrap_rationale_27",
-      "label": "Prepare storage and seed development data.",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "rationale",
-      "norm_label": "prepare storage and seed development data.",
-      "source_file": "src/acip/bootstrap.py",
-      "source_location": "L27"
-    },
-    {
       "id": "src_acip_bootstrap_rationale_35",
       "label": "Create the bootstrap admin if it does not already exist. Returns ``None`` when\u2026",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "rationale",
       "norm_label": "create the bootstrap admin if it does not already exist. returns ``none`` when...",
       "source_file": "src/acip/bootstrap.py",
       "source_location": "L35"
     },
     {
+      "id": "src_acip_core_audit_rationale_1",
+      "label": "Audit trail writes. Security-relevant actions are recorded in an append-only\u2026",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "rationale",
+      "norm_label": "audit trail writes. security-relevant actions are recorded in an append-only...",
+      "source_file": "src/acip/core/audit.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_core_orchestration_runner_rationale_1",
+      "label": "Background execution of investigations. M1 runs investigations as asyncio tasks\u2026",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": "auth.py",
+      "file_type": "rationale",
+      "norm_label": "background execution of investigations. m1 runs investigations as asyncio tasks...",
+      "source_file": "src/acip/core/orchestration/runner.py",
+      "source_location": "L1"
+    },
+    {
       "id": "src_acip_core_security_passwords_rationale_1",
       "label": "Password hashing. Argon2id via ``argon2-cffi``, which is the current OWASP\u2026",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "rationale",
       "norm_label": "password hashing. argon2id via ``argon2-cffi``, which is the current owasp...",
       "source_file": "src/acip/core/security/passwords.py",
@@ -11783,7 +11728,7 @@
       "label": "Return whether the password matches. Never raises on a bad password.",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "rationale",
       "norm_label": "return whether the password matches. never raises on a bad password.",
       "source_file": "src/acip/core/security/passwords.py",
@@ -11794,44 +11739,11 @@
       "label": "True when the hash was produced with weaker parameters than current.",
       "_origin": "ast",
       "community": 22,
-      "community_name": "bootstrap.py",
+      "community_name": "auth.py",
       "file_type": "rationale",
       "norm_label": "true when the hash was produced with weaker parameters than current.",
       "source_file": "src/acip/core/security/passwords.py",
       "source_location": "L39"
-    },
-    {
-      "id": "src_acip_db_migrate_rationale_1",
-      "label": "Schema creation, through Alembic and only through Alembic. The migration chain\u2026",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "rationale",
-      "norm_label": "schema creation, through alembic and only through alembic. the migration chain...",
-      "source_file": "src/acip/db/migrate.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_acip_db_migrate_rationale_52",
-      "label": "Build an Alembic config without reading ``alembic.ini``. The ini file carries a\u2026",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "rationale",
-      "norm_label": "build an alembic config without reading ``alembic.ini``. the ini file carries a...",
-      "source_file": "src/acip/db/migrate.py",
-      "source_location": "L52"
-    },
-    {
-      "id": "src_acip_db_migrate_rationale_76",
-      "label": "Bring the database at ``url`` up to ``revision``, creating it if absent.",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "bootstrap.py",
-      "file_type": "rationale",
-      "norm_label": "bring the database at ``url`` up to ``revision``, creating it if absent.",
-      "source_file": "src/acip/db/migrate.py",
-      "source_location": "L76"
     },
     {
       "id": "admin",
@@ -12681,11 +12593,55 @@
       "source_location": "L65"
     },
     {
+      "id": "config",
+      "label": "Config",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "config",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_acip_config_py_model_validator",
+      "label": "model_validator",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "model_validator",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_acip_db_migrate",
+      "label": "migrate.py",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "migrate.py",
+      "source_file": "src/acip/db/migrate.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_db_migrate_py_connection",
+      "label": "Connection",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "code",
+      "norm_label": "connection",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "tests_integration_test_migrations",
       "label": "test_migrations.py",
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "code",
       "norm_label": "test_migrations.py",
       "source_file": "tests/integration/test_migrations.py",
@@ -12696,18 +12652,62 @@
       "label": "Connection",
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "code",
       "norm_label": "connection",
       "source_file": "",
       "source_location": ""
     },
     {
+      "id": "src_acip_config_rationale_99",
+      "label": "Require a real secret in production; generate an ephemeral one otherwise. A\u2026",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "rationale",
+      "norm_label": "require a real secret in production; generate an ephemeral one otherwise. a...",
+      "source_file": "src/acip/config.py",
+      "source_location": "L99"
+    },
+    {
+      "id": "src_acip_db_migrate_rationale_1",
+      "label": "Schema creation, through Alembic and only through Alembic. The migration chain\u2026",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "rationale",
+      "norm_label": "schema creation, through alembic and only through alembic. the migration chain...",
+      "source_file": "src/acip/db/migrate.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_acip_db_migrate_rationale_52",
+      "label": "Build an Alembic config without reading ``alembic.ini``. The ini file carries a\u2026",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "rationale",
+      "norm_label": "build an alembic config without reading ``alembic.ini``. the ini file carries a...",
+      "source_file": "src/acip/db/migrate.py",
+      "source_location": "L52"
+    },
+    {
+      "id": "src_acip_db_migrate_rationale_76",
+      "label": "Bring the database at ``url`` up to ``revision``, creating it if absent.",
+      "_origin": "ast",
+      "community": 33,
+      "community_name": "migrate.py",
+      "file_type": "rationale",
+      "norm_label": "bring the database at ``url`` up to ``revision``, creating it if absent.",
+      "source_file": "src/acip/db/migrate.py",
+      "source_location": "L76"
+    },
+    {
       "id": "tests_integration_test_migrations_rationale_1",
       "label": "The migration chain is the schema, so the suite runs on it. Every fixture\u2026",
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "rationale",
       "norm_label": "the migration chain is the schema, so the suite runs on it. every fixture...",
       "source_file": "tests/integration/test_migrations.py",
@@ -12718,7 +12718,7 @@
       "label": "The fixture's schema came from Alembic, not from ``create_all``.",
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "rationale",
       "norm_label": "the fixture's schema came from alembic, not from ``create_all``.",
       "source_file": "tests/integration/test_migrations.py",
@@ -12729,7 +12729,7 @@
       "label": "``Base.metadata`` describes exactly what the migrations build.",
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "rationale",
       "norm_label": "``base.metadata`` describes exactly what the migrations build.",
       "source_file": "tests/integration/test_migrations.py",
@@ -12740,7 +12740,7 @@
       "label": "A second engine on ``:memory:`` would migrate a different database.",
       "_origin": "ast",
       "community": 33,
-      "community_name": "test_migrations.py",
+      "community_name": "migrate.py",
       "file_type": "rationale",
       "norm_label": "a second engine on ``:memory:`` would migrate a different database.",
       "source_file": "tests/integration/test_migrations.py",
@@ -23156,7 +23156,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L54",
+      "source_location": "L86",
       "weight": 1.0
     },
     {
@@ -23168,7 +23168,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L55",
+      "source_location": "L87",
       "weight": 1.0
     },
     {
@@ -23180,7 +23180,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L56",
+      "source_location": "L88",
       "weight": 1.0
     },
     {
@@ -23192,7 +23192,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L71",
+      "source_location": "L103",
       "weight": 1.0
     },
     {
@@ -23204,7 +23204,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L78",
+      "source_location": "L110",
       "weight": 1.0
     },
     {
@@ -23216,7 +23216,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L88",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
@@ -23228,7 +23228,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L358",
+      "source_location": "L390",
       "weight": 1.0
     },
     {
@@ -23240,7 +23240,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L143",
+      "source_location": "L175",
       "weight": 1.0
     },
     {
@@ -23252,7 +23252,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L345",
+      "source_location": "L377",
       "weight": 1.0
     },
     {
@@ -23264,7 +23264,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L107",
+      "source_location": "L139",
       "weight": 1.0
     },
     {
@@ -23276,7 +23276,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L111",
+      "source_location": "L143",
       "weight": 1.0
     },
     {
@@ -23288,7 +23288,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L131",
+      "source_location": "L163",
       "weight": 1.0
     },
     {
@@ -23300,7 +23300,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "web/app.js",
-      "source_location": "L596",
+      "source_location": "L632",
       "weight": 1.0
     },
     {
@@ -45537,6 +45537,17 @@
     },
     {
       "source": "web_app",
+      "target": "web_app_loadinvestigations",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "web/app.js",
+      "source_location": "L100",
+      "weight": 1.0
+    },
+    {
+      "source": "web_app",
       "target": "web_app_api",
       "relation": "contains",
       "_origin": "ast",
@@ -45548,24 +45559,24 @@
     },
     {
       "source": "web_app",
+      "target": "web_app_selectinvestigation",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "web/app.js",
+      "source_location": "L129",
+      "weight": 1.0
+    },
+    {
+      "source": "web_app",
       "target": "web_app_renderworkspace",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "web/app.js",
-      "source_location": "L135",
-      "weight": 1.0
-    },
-    {
-      "source": "web_app",
-      "target": "web_app_setauth",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "web/app.js",
-      "source_location": "L34",
+      "source_location": "L167",
       "weight": 1.0
     },
     {
@@ -45576,18 +45587,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "web/app.js",
-      "source_location": "L356",
-      "weight": 1.0
-    },
-    {
-      "source": "web_app",
-      "target": "web_app_checkcurrentuser",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "web/app.js",
-      "source_location": "L51",
+      "source_location": "L388",
       "weight": 1.0
     },
     {
@@ -45598,7 +45598,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "web/app.js",
-      "source_location": "L590",
+      "source_location": "L626",
       "weight": 1.0
     },
     {
@@ -45609,7 +45609,29 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "web/app.js",
-      "source_location": "L609",
+      "source_location": "L645",
+      "weight": 1.0
+    },
+    {
+      "source": "web_app",
+      "target": "web_app_setauth",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "web/app.js",
+      "source_location": "L66",
+      "weight": 1.0
+    },
+    {
+      "source": "web_app",
+      "target": "web_app_checkcurrentuser",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "web/app.js",
+      "source_location": "L83",
       "weight": 1.0
     },
     {
@@ -45620,29 +45642,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "web/app.js",
-      "source_location": "L62",
-      "weight": 1.0
-    },
-    {
-      "source": "web_app",
-      "target": "web_app_loadinvestigations",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "web/app.js",
-      "source_location": "L68",
-      "weight": 1.0
-    },
-    {
-      "source": "web_app",
-      "target": "web_app_selectinvestigation",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "web/app.js",
-      "source_location": "L97",
+      "source_location": "L94",
       "weight": 1.0
     },
     {
@@ -63535,5 +63535,5 @@
       "source_file": "docs/evidence-model.md"
     }
   ],
-  "built_at_commit": "37acdf7020d3b7151456b657ceac15ef534ea7c9"
+  "built_at_commit": "a98bdd8595507fae3d82084b4d0bbaeba0a9a8ab"
 }
