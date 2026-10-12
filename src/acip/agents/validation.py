@@ -59,6 +59,7 @@ class ValidationAgent(Agent):
         has_confirmed_attacks = any(
             ev.kind == EvidenceKind.WEB_ATTACK.value
             or (ev.kind == EvidenceKind.AUTH_EVENT.value and ev.data.get("outcome") == "failure")
+            or (ev.kind == EvidenceKind.THREAT_INTEL.value and bool(ev.data.get("is_malicious")))
             for ev in evidence_rows
         )
 
@@ -103,7 +104,12 @@ class ValidationAgent(Agent):
                     )
 
             # Test 2: Malicious intrusion hypothesis
-            elif "intrusion" in statement or "unauthorized" in statement or "attack" in statement:
+            elif (
+                "intrusion" in statement
+                or "unauthorized" in statement
+                or "attack" in statement
+                or "malicious" in statement
+            ):
                 if has_confirmed_attacks or has_priv_esc_evidence:
                     hyp.status = HypothesisStatus.SUPPORTED.value
                     supported_count += 1

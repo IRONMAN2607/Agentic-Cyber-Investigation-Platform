@@ -283,6 +283,18 @@ class CorrelationAgent(Agent):
             EvidenceKind.WEB_ATTACK.value,
         }:
             candidates.append((EntityType.URL, str(data["path"]), "target"))
+        if data.get("indicator") and ev.kind == EvidenceKind.THREAT_INTEL.value:
+            itype = str(data.get("indicator_type", "ip")).lower()
+            etype = (
+                EntityType.IP
+                if itype in {"ip", "ipv4", "ipv6"}
+                else EntityType.DOMAIN
+                if itype == "domain"
+                else EntityType.HASH
+            )
+            candidates.append((etype, str(data["indicator"]), "indicator"))
+        if data.get("source") and ev.kind == EvidenceKind.THREAT_INTEL.value:
+            candidates.append((EntityType.HOST, str(data["source"]), "intel_source"))
 
         for etype, val, role in candidates:
             v_clean = val.strip()
@@ -383,12 +395,25 @@ class CorrelationAgent(Agent):
 
         # 5. Threat Intelligence
         elif kind == EvidenceKind.THREAT_INTEL.value:
-            indicator_val = data.get("query")
-            indicator_type_str = data.get("entity_type")
+            indicator_val = data.get("indicator") or data.get("query")
+            indicator_type_str = data.get("indicator_type") or data.get("entity_type") or "ip"
             if indicator_val and indicator_type_str:
                 try:
-                    ind_type = EntityType(indicator_type_str)
+                    itype = str(indicator_type_str).lower()
+                    ind_type = (
+                        EntityType.IP
+                        if itype in {"ip", "ipv4", "ipv6"}
+                        else EntityType.DOMAIN
+                        if itype == "domain"
+                        else EntityType.HASH
+                    )
                     ind_id = get_ent_id(ind_type, str(indicator_val))
+                    source_val = data.get("source")
+                    if ind_id and source_val:
+                        src_id = get_ent_id(EntityType.HOST, str(source_val))
+                        if src_id and ind_id != src_id:
+                            rel = "FLAGGED_BY" if data.get("is_malicious") else "EVALUATED_BY"
+                            derived.append((ind_id, src_id, rel))
                     for tag in data.get("tags", []):
                         tag_id = get_ent_id(EntityType.MALWARE, str(tag))
                         if ind_id and tag_id:

@@ -404,17 +404,19 @@ class OrchestratorAgent:
                         ),
                     )
                 )
-            if self._agents.has("correlation"):
-                tasks.append(
-                    Task(
-                        task_id="t4-correlation",
-                        agent_name="correlation",
-                        rationale=(
-                            "Builds the canonical evidence graph, resolves entities "
-                            "deterministically, and derives evidence-backed relational edges."
-                        ),
-                    )
+
+        if self._agents.has("correlation"):
+            tasks.append(
+                Task(
+                    task_id="t4-correlation",
+                    agent_name="correlation",
+                    rationale=(
+                        "Builds the canonical evidence graph, resolves entities "
+                        "deterministically, and derives evidence-backed relational edges."
+                    ),
                 )
+            )
+
 
         if self._agents.has("reporting"):
             tasks.append(
@@ -445,18 +447,22 @@ class OrchestratorAgent:
                         from acip.core.security.files import store_bytes
                         from acip.core.security.ssrf import SafeHTTPFetcher
 
+                        target_url = investigation.target_value.strip()
+                        if not target_url.startswith(("http://", "https://")):
+                            target_url = f"http://{target_url}"
+
                         fetcher = SafeHTTPFetcher(
                             max_bytes=self._settings.max_artifact_bytes,
                             max_redirects=3,
                             timeout_seconds=5.0,
                         )
-                        fetch_res = await fetcher.fetch_url(investigation.target_value)
+                        fetch_res = await fetcher.fetch_url(target_url)
                         stored = await store_bytes(
                             fetch_res.content,
                             dest_dir=self._settings.artifact_dir,
                             max_bytes=self._settings.max_artifact_bytes,
                             original_filename=f"url_target_{fetch_res.sha256[:8]}.bin",
-                            declared_kind=ArtifactKind.UNKNOWN,
+                            declared_kind=ArtifactKind.URL_RESPONSE,
                         )
                         auto_art = Artifact(
                             investigation_id=investigation.id,
@@ -472,30 +478,45 @@ class OrchestratorAgent:
                         artifacts = await _load_artifacts(session, investigation_id)
                     except Exception as exc:
                         logger.warning(
-                            "automatic URL artifact intake could not complete: %s",
+                            "automatic URL artifact intake could not complete: %s; "
+                            "falling back to indicator artifact",
                             exc,
                             extra={"url": investigation.target_value},
                         )
-                elif investigation.target_type_enum in {
-                    TargetType.LOG,
-                    TargetType.FILE,
-                    TargetType.DESCRIPTION,
-                }:
+
+                # Fallback intake: persist target_value as an indicator artifact if empty
+                if not artifacts and investigation.target_value:
                     raw_val = investigation.target_value.strip()
-                    if ("\n" in raw_val or " " in raw_val) and len(raw_val) >= 20:
+                    if raw_val:
                         try:
                             from acip.core.security.files import store_bytes
 
-                            decl_kind = (
-                                ArtifactKind.LINUX_AUTH_LOG
-                                if investigation.target_type_enum == TargetType.LOG
-                                else ArtifactKind.GENERIC_TEXT
-                            )
-                            fname = (
-                                "target_content.log"
-                                if decl_kind == ArtifactKind.LINUX_AUTH_LOG
-                                else "target_content.txt"
-                            )
+                            match investigation.target_type_enum:
+                                case TargetType.LOG:
+                                    decl_kind = ArtifactKind.LINUX_AUTH_LOG
+                                    fname = "target_content.log"
+                                case TargetType.PCAP:
+                                    decl_kind = ArtifactKind.PCAP
+                                    fname = "target_capture.pcap"
+                                case TargetType.URL:
+                                    decl_kind = ArtifactKind.GENERIC_TEXT
+                                    fname = "target_url.txt"
+                                case TargetType.DOMAIN:
+                                    decl_kind = ArtifactKind.GENERIC_TEXT
+                                    fname = "target_domain.txt"
+                                case TargetType.IP:
+                                    decl_kind = ArtifactKind.GENERIC_TEXT
+                                    fname = "target_ip.txt"
+                                case TargetType.HASH:
+                                    decl_kind = ArtifactKind.GENERIC_TEXT
+                                    fname = "target_hash.txt"
+                                case TargetType.FILE:
+                                    decl_kind = ArtifactKind.GENERIC_TEXT
+                                    fname = "target_file.txt"
+                                case _:
+                                    decl_kind = ArtifactKind.GENERIC_TEXT
+                                    fname = "target_content.txt"
+
                             stored = await store_bytes(
                                 raw_val.encode("utf-8"),
                                 dest_dir=self._settings.artifact_dir,
@@ -517,7 +538,7 @@ class OrchestratorAgent:
                             artifacts = await _load_artifacts(session, investigation_id)
                         except Exception as exc:
                             logger.warning(
-                                "automatic text artifact intake could not complete: %s", exc
+                                "automatic indicator artifact intake could not complete: %s", exc
                             )
 
             # If a planner is provided, respect its plan

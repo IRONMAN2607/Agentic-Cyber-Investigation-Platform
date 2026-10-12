@@ -115,7 +115,14 @@ class ReasoningAgent(Agent):
             # Fallback: summarize overall graph connectivity if no single end-to-end path exists
             relations_found = {e.relation for e in graph.edges}
             cited_ev = [e.evidence_id for e in graph.edges[: min(5, len(graph.edges))]]
-            rel_str = ", ".join(sorted(relations_found))
+            if not cited_ev:
+                all_ev, _ = await ctx.store.all_evidence(cap=5)
+                cited_ev = [e.id for e in all_ev]
+
+            rel_str = ", ".join(sorted(relations_found)) if relations_found else "None"
+            assertion_cls = (
+                AssertionClass.INFERENCE if cited_ev else AssertionClass.HYPOTHESIS
+            )
             summary_finding = await ctx.store.add_finding(
                 FindingDraft(
                     title="Graph Reasoning: Cross-Source Activity Correlation",
@@ -123,14 +130,14 @@ class ReasoningAgent(Agent):
                         f"Synthesized evidence relationships across {len(graph.entities)} "
                         f"entities and {len(graph.edges)} edges. Observed types: {rel_str}."
                     ),
-                    assertion_class=AssertionClass.INFERENCE,
+                    assertion_class=assertion_cls,
                     severity=Severity.INFO,
                     confidence=0.85,
                     evidence_ids=cited_ev,
                     reasoning=(
-                        "Reasoning agent evaluated graph paths across authentication and "
-                        "network nodes; no full end-to-end compromise path reached "
-                        "privilege escalation."
+                        "Reasoning agent evaluated graph paths across authentication, threat "
+                        "intelligence, and network nodes; no full multi-stage compromise path "
+                        "reached privilege escalation."
                     ),
                     detection_rule="reasoning.correlation_summary",
                 ),

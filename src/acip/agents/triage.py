@@ -26,7 +26,9 @@ from acip.logging import get_logger
 from acip.tools.ioc_extractor import IOCExtractor
 from acip.types import (
     AgentCapability,
+    ArtifactKind,
     AssertionClass,
+    EvidenceKind,
     RunStatus,
     Severity,
     TargetType,
@@ -68,6 +70,8 @@ class TriageAgent(Agent):
         warnings: list[str] = []
         metrics: dict[str, Any] = {"sources_scanned": 0}
 
+        ioc_evidence: list[Evidence] = []
+
         # 1. Deterministic Extraction via IOCExtractor
         if ctx.investigation.target_type_enum in _SCANNABLE_TARGETS:
             invocation = await ctx.tools.run(
@@ -76,6 +80,7 @@ class TriageAgent(Agent):
                 agent_run_id=ctx.agent_run_id,
             )
             collected.extend(invocation.evidence)
+            ioc_evidence.extend(invocation.evidence)
             warnings.extend(invocation.result.warnings)
             metrics["sources_scanned"] += 1
 
@@ -88,20 +93,121 @@ class TriageAgent(Agent):
                 artifact_path=_path(artifact),
             )
             collected.extend(invocation.evidence)
+            ioc_evidence.extend(invocation.evidence)
             warnings.extend(invocation.result.warnings)
             metrics["sources_scanned"] += 1
+
+        # 1b. Deterministic Packet Capture Parsing via PcapParser
+        pcap_artifacts = [
+            a
+            for a in ctx.artifacts
+            if a.kind in {ArtifactKind.PCAP.value, ArtifactKind.PCAP_NG.value}
+            or a.original_filename.lower().endswith((".pcap", ".pcapng"))
+        ]
+        pcap_evidence_list: list[Evidence] = []
+        for pcap_art in pcap_artifacts:
+            try:
+                pcap_inv = await ctx.tools.run(
+                    "pcap_parser",
+                    {},
+                    agent_run_id=ctx.agent_run_id,
+                    artifact_id=pcap_art.id,
+                    artifact_path=_path(pcap_art),
+                )
+                collected.extend(pcap_inv.evidence)
+                pcap_evidence_list.extend(pcap_inv.evidence)
+                warnings.extend(pcap_inv.result.warnings)
+                metrics["sources_scanned"] += 1
+            except Exception as exc:
+                logger.warning(
+                    "pcap parsing failed for artifact %s: %s",
+                    pcap_art.original_filename,
+                    exc,
+                )
+
+        # 1c. Threat Intelligence Enrichment via ThreatIntelTool
+        ti_candidates: list[tuple[str, str]] = []  # (indicator_value, indicator_type)
+        t_val = ctx.investigation.target_value.strip()
+
+        # Check direct investigation target
+        if ctx.investigation.target_type_enum == TargetType.IP and t_val:
+            ti_candidates.append((t_val, "ip"))
+        elif ctx.investigation.target_type_enum == TargetType.DOMAIN and t_val:
+            ti_candidates.append((t_val, "domain"))
+        elif ctx.investigation.target_type_enum == TargetType.HASH and t_val:
+            ti_candidates.append((t_val, "hash"))
+        elif ctx.investigation.target_type_enum == TargetType.URL and t_val:
+            parsed_host = _extract_host_from_url(t_val)
+            if parsed_host:
+                h_type = "ip" if _is_ip_address(parsed_host) else "domain"
+                ti_candidates.append((parsed_host, h_type))
+
+        # Check extracted IOCs and DNS queries
+        for row in collected:
+            i_type = str(row.data.get("ioc_type", ""))
+            i_val = str(row.data.get("value") or row.data.get("match") or "").strip()
+            if not i_val:
+                continue
+            if i_type in {"ipv4", "ipv6"} and row.data.get("scope", "global") == "global":
+                ti_candidates.append((i_val, "ip"))
+            elif i_type == "domain":
+                ti_candidates.append((i_val, "domain"))
+            elif i_type in {"sha256", "sha1", "md5"}:
+                ti_candidates.append((i_val, "hash"))
+            elif i_type == "url":
+                parsed_host = _extract_host_from_url(i_val)
+                if parsed_host:
+                    h_type = "ip" if _is_ip_address(parsed_host) else "domain"
+                    ti_candidates.append((parsed_host, h_type))
+            elif row.kind == EvidenceKind.DNS_QUERY.value:
+                q_val = str(row.data.get("query", "")).strip()
+                if q_val:
+                    ti_candidates.append((q_val, "domain"))
+
+        # Deduplicate candidates preserving order
+        deduped_ti: list[tuple[str, str]] = []
+        seen_ti: set[tuple[str, str]] = set()
+        for cand in ti_candidates:
+            if cand not in seen_ti and cand[0]:
+                seen_ti.add(cand)
+                deduped_ti.append(cand)
+
+        threat_intel_evidence: list[Evidence] = []
+        for ind_val, ind_type in deduped_ti[:15]:
+            try:
+                ti_inv = await ctx.tools.run(
+                    "threat_intel",
+                    {
+                        "indicator": ind_val,
+                        "indicator_type": ind_type,
+                        "opt_in_external_lookup": True,
+                    },
+                    agent_run_id=ctx.agent_run_id,
+                )
+                collected.extend(ti_inv.evidence)
+                threat_intel_evidence.extend(ti_inv.evidence)
+                warnings.extend(ti_inv.result.warnings)
+            except Exception as exc:
+                logger.warning(
+                    "threat intelligence lookup failed for %s: %s",
+                    ind_val,
+                    exc,
+                )
 
         by_type: dict[str, int] = {}
         global_indicators: list[Evidence] = []
         for row in collected:
-            ioc_type = str(row.data.get("ioc_type", "unknown"))
+            ioc_type = str(row.data.get("ioc_type") or row.data.get("indicator_type") or row.kind)
             by_type[ioc_type] = by_type.get(ioc_type, 0) + 1
             if row.data.get("scope", "global") == "global":
                 global_indicators.append(row)
 
-        metrics["indicators_total"] = len(collected)
+        metrics["indicators_total"] = len(ioc_evidence)
+        metrics["evidence_total"] = len(collected)
         metrics["indicators_by_type"] = by_type
         metrics["externally_routable"] = len(global_indicators)
+        metrics["threat_intel_lookups"] = len(threat_intel_evidence)
+        metrics["pcap_evidence_count"] = len(pcap_evidence_list)
 
         # 2. Structured Triage Reasoning (via ModelRouter or Rule-Based Fallback)
         analysis = await self._perform_triage_analysis(ctx, collected, global_indicators, by_type)
@@ -113,7 +219,15 @@ class TriageAgent(Agent):
         metrics["planned_tasks_count"] = len(analysis.investigation_plan)
 
         # 3. Record Grounded Findings
-        findings = await self._record_findings(ctx, collected, global_indicators, by_type, analysis)
+        findings = await self._record_findings(
+            ctx,
+            collected,
+            global_indicators,
+            by_type,
+            analysis,
+            threat_intel_evidence=threat_intel_evidence,
+            pcap_evidence=pcap_evidence_list,
+        )
 
         next_actions = [
             f"[{proposal.priority}] {proposal.task_type}: {proposal.rationale}"
@@ -330,6 +444,7 @@ class TriageAgent(Agent):
             )
 
         plan: list[PlannedTaskProposal] = []
+        prio = 1
         if has_auth_log:
             plan.append(
                 PlannedTaskProposal(
@@ -337,22 +452,66 @@ class TriageAgent(Agent):
                     rationale=(
                         "Parse auth logs and evaluate deterministic rules for credential abuse"
                     ),
-                    priority=1,
+                    priority=prio,
                 )
             )
-        if global_indicators:
+            prio += 1
             plan.append(
                 PlannedTaskProposal(
-                    task_type="threat_intelligence",
-                    rationale="Enrich external indicators against threat intelligence databases",
-                    priority=2,
+                    task_type="mitre",
+                    rationale="Map observed detection rules to verified MITRE ATT&CK techniques",
+                    priority=prio,
                 )
             )
+            prio += 1
+
+        plan.append(
+            PlannedTaskProposal(
+                task_type="correlation",
+                rationale=(
+                    "Correlate evidence into canonical entity graph and resolve cross-source edges"
+                ),
+                priority=prio,
+            )
+        )
+        prio += 1
+
+        plan.append(
+            PlannedTaskProposal(
+                task_type="reasoning",
+                rationale="Perform multi-hop graph path analysis to reconstruct attack progression",
+                priority=prio,
+            )
+        )
+        prio += 1
+
+        plan.append(
+            PlannedTaskProposal(
+                task_type="hypothesis",
+                rationale=(
+                    "Formulate competing candidate explanations declaring refutation criteria"
+                ),
+                priority=prio,
+            )
+        )
+        prio += 1
+
+        plan.append(
+            PlannedTaskProposal(
+                task_type="validation",
+                rationale=(
+                    "Evaluate refutation conditions against observed evidence to resolve hypotheses"
+                ),
+                priority=prio,
+            )
+        )
+        prio += 1
+
         plan.append(
             PlannedTaskProposal(
                 task_type="reporting",
                 rationale="Synthesize all evidence, findings, and gaps into an executive report",
-                priority=3,
+                priority=prio,
             )
         )
 
@@ -371,6 +530,8 @@ class TriageAgent(Agent):
         global_indicators: list[Evidence],
         by_type: dict[str, int],
         analysis: TriageAnalysis,
+        threat_intel_evidence: list[Evidence] | None = None,
+        pcap_evidence: list[Evidence] | None = None,
     ) -> list[str]:
         findings: list[str] = []
 
@@ -416,7 +577,79 @@ class TriageAgent(Agent):
             )
             findings.append(str(finding.id))
 
-        # 2. Triage Classification (INFERENCE or HYPOTHESIS) (G2/G3 compliant)
+        # 2. Threat Intelligence Reputation Findings (FACT, G1 compliant)
+        for ti_ev in threat_intel_evidence or []:
+            data = ti_ev.data or {}
+            indicator = str(data.get("indicator") or "unknown")
+            is_mal = bool(data.get("is_malicious", False))
+            source = str(data.get("source", "ThreatIntel"))
+            score = int(data.get("abuse_score", 0))
+            category = str(data.get("category", "Threat Intelligence"))
+            reports = int(data.get("reports_count", 0))
+
+            if is_mal:
+                finding_ti = await ctx.store.add_finding(
+                    FindingDraft(
+                        title=f"Threat Intelligence Alert: {indicator} ({category})",
+                        description=(
+                            f"Indicator '{indicator}' is flagged as malicious by {source} "
+                            f"with an abuse score of {score}% ({reports} report(s)). "
+                            f"Threat Category: {category}."
+                        ),
+                        assertion_class=AssertionClass.FACT,
+                        severity=Severity.CRITICAL if score >= 95 else Severity.HIGH,
+                        confidence=min(1.0, max(0.8, score / 100.0)),
+                        evidence_ids=[ti_ev.id],
+                        detection_rule="threat_intel.reputation",
+                    ),
+                    agent_run_id=ctx.agent_run_id,
+                )
+                findings.append(str(finding_ti.id))
+            elif indicator == ctx.investigation.target_value.strip():
+                finding_ti = await ctx.store.add_finding(
+                    FindingDraft(
+                        title=f"Threat Intelligence: {indicator} (Clean / Low Risk)",
+                        description=(
+                            f"Indicator '{indicator}' was checked against {source}. "
+                            f"Abuse score is {score}%. No malicious activity was reported."
+                        ),
+                        assertion_class=AssertionClass.FACT,
+                        severity=Severity.INFO,
+                        confidence=1.0,
+                        evidence_ids=[ti_ev.id],
+                        detection_rule="threat_intel.reputation",
+                    ),
+                    agent_run_id=ctx.agent_run_id,
+                )
+                findings.append(str(finding_ti.id))
+
+        # 3. PCAP Network Traffic Findings (FACT, G1 compliant)
+        if pcap_evidence:
+            flow_count = sum(1 for e in pcap_evidence if e.kind == EvidenceKind.NETWORK_FLOW.value)
+            dns_count = sum(1 for e in pcap_evidence if e.kind == EvidenceKind.DNS_QUERY.value)
+            if flow_count > 0 or dns_count > 0:
+                pcap_finding = await ctx.store.add_finding(
+                    FindingDraft(
+                        title=(
+                            f"Network Packet Capture: {flow_count} flow(s), "
+                            f"{dns_count} DNS query(ies)"
+                        ),
+                        description=(
+                            f"Deterministic packet dissection extracted {flow_count} network "
+                            f"flow(s) and {dns_count} DNS query resolution(s) from attached "
+                            "packet capture artifacts."
+                        ),
+                        assertion_class=AssertionClass.FACT,
+                        severity=Severity.INFO,
+                        confidence=1.0,
+                        evidence_ids=[e.id for e in pcap_evidence[:_MAX_CITED]],
+                        detection_rule="pcap.traffic_inventory",
+                    ),
+                    agent_run_id=ctx.agent_run_id,
+                )
+                findings.append(str(pcap_finding.id))
+
+        # 4. Triage Classification (INFERENCE or HYPOTHESIS) (G2/G3 compliant)
         formatted_cat = analysis.classification.category.replace("_", " ").title()
         if collected:
             finding_cls = await ctx.store.add_finding(
@@ -448,7 +681,7 @@ class TriageAgent(Agent):
             )
             findings.append(str(finding_cls.id))
 
-        # 3. Evidence Gaps (UNKNOWN, bounded to <= INFO per G4)
+        # 5. Evidence Gaps (UNKNOWN, bounded to <= INFO per G4)
         for gap in analysis.evidence_gaps:
             finding_gap = await ctx.store.add_finding(
                 FindingDraft(
@@ -475,6 +708,31 @@ class TriageAgent(Agent):
 
 def _path(artifact: Any) -> Path:
     return Path(artifact.storage_path)
+
+
+def _extract_host_from_url(url: str) -> str:
+    """Safely extract the domain or IP hostname from a URL candidate."""
+    from urllib.parse import urlparse
+
+    clean_url = url.strip()
+    if not clean_url.startswith(("http://", "https://", "ftp://")):
+        clean_url = f"http://{clean_url}"
+    try:
+        parsed = urlparse(clean_url)
+        return parsed.hostname or ""
+    except Exception:
+        return ""
+
+
+def _is_ip_address(candidate: str) -> bool:
+    """Check if string is a valid IPv4 or IPv6 address."""
+    import ipaddress
+
+    try:
+        ipaddress.ip_address(candidate.strip())
+        return True
+    except ValueError:
+        return False
 
 
 def _read_artifact_snippet(artifact: Any, max_bytes: int = _MAX_SNIPPET_BYTES) -> str:

@@ -120,21 +120,22 @@ class StaticPlanner:
                         ),
                     )
                 )
-            if self._registry.has("correlation"):
-                tasks.append(
-                    Task(
-                        task_id="t4-correlation",
-                        agent_name="correlation",
-                        rationale=(
-                            "Builds the canonical evidence graph, resolves entities "
-                            "deterministically, and derives evidence-backed relational edges."
-                        ),
-                    )
-                )
         else:
             notes.append(
                 "Log analysis was not scheduled: no submitted artifact could plausibly "
                 "contain authentication or web access records."
+            )
+
+        if self._registry.has("correlation"):
+            tasks.append(
+                Task(
+                    task_id=f"t{len(tasks) + 1}-correlation",
+                    agent_name="correlation",
+                    rationale=(
+                        "Builds the canonical evidence graph, resolves entities "
+                        "deterministically, and derives evidence-backed relational edges."
+                    ),
+                )
             )
 
         tasks.append(

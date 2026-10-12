@@ -1069,6 +1069,24 @@
     }
   });
 
+  const targetTypeEl = document.getElementById("inv-target-type");
+  const targetValEl = document.getElementById("inv-target-value");
+  const targetPlaceholders = {
+    url: "e.g. https://malicious.example.com/payload.sh",
+    ip: "e.g. 198.51.100.23",
+    domain: "e.g. evil-attacker.example.com",
+    hash: "e.g. 44d88612fea8a8f36de82e1278abb02f",
+    log: "e.g. auth.log or access.log",
+    pcap: "e.g. capture.pcap",
+    file: "e.g. suspicious_sample.bin",
+    description: "e.g. Multiple failed logins followed by privilege escalation",
+  };
+  if (targetTypeEl && targetValEl) {
+    targetTypeEl.addEventListener("change", () => {
+      targetValEl.placeholder = targetPlaceholders[targetTypeEl.value] || "e.g. indicator value";
+    });
+  }
+
   document.getElementById("form-new-inv").addEventListener("submit", async (e) => {
     e.preventDefault();
     const title = document.getElementById("inv-title").value;

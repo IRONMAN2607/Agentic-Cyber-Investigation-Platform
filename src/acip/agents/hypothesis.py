@@ -56,6 +56,7 @@ class HypothesisAgent(Agent):
         has_auth_anomaly = False
         has_web_anomaly = False
         has_priv_esc = False
+        has_threat_anomaly = False
 
         for f in findings:
             if f.severity == Severity.INFO.value or (f.detection_rule or "").endswith(
@@ -69,6 +70,8 @@ class HypothesisAgent(Agent):
                     pass
             rule = (f.detection_rule or "").lower()
             title = f.title.lower()
+            if "threat_intel" in rule or "threat intelligence" in title:
+                has_threat_anomaly = True
             if "bruteforce" in rule or "brute" in title or "preceded by failures" in title:
                 has_auth_anomaly = True
             if (
@@ -93,6 +96,8 @@ class HypothesisAgent(Agent):
                     has_web_anomaly = True
             if ev.data.get("event_type") == "sudo_command":
                 has_priv_esc = True
+            if ev.kind == EvidenceKind.THREAT_INTEL.value and ev.data.get("is_malicious"):
+                has_threat_anomaly = True
 
         hypotheses_created: list[uuid.UUID] = []
         gaps_created: list[uuid.UUID] = []
@@ -101,15 +106,15 @@ class HypothesisAgent(Agent):
         primary_cited = list(dict.fromkeys(suspicious_evidence_ids))[:5]
 
         # Formulate Hypothesis 1: Malicious / External Campaign
-        if has_auth_anomaly or has_web_anomaly or has_priv_esc:
+        if has_auth_anomaly or has_web_anomaly or has_priv_esc or has_threat_anomaly:
             h1_statement = (
                 "Observed security events represent a coordinated, unauthorized intrusion "
-                "attempt: adversary performed automated scanning / credential guessing "
-                "to obtain unauthorized access."
+                "or malicious infrastructure campaign: adversary infrastructure was verified "
+                "or brute-force/web attacks were detected."
             )
             h1_refutation = (
                 "Verified proof that the observed traffic originates from an authorized "
-                "internal vulnerability scanner or authorized security red-team exercise "
+                "internal vulnerability scanner, approved red-team test, or benign lookup "
                 "within approved change window."
             )
             h1 = await ctx.store.add_hypothesis(

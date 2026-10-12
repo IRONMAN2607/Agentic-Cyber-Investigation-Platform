@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     llm_max_investigation_tokens: int = Field(default=200_000, ge=1_000)
     llm_schema_retries: int = Field(default=2, ge=0, le=5)
     enable_llm_triage: bool = Field(default=False)
-    enable_adaptive_planning: bool = Field(default=False)
+    enable_adaptive_planning: bool = Field(default=True)
 
     # --- Dev bootstrap (ignored in prod) ------------------------------------
     bootstrap_admin_username: str = "admin"
