@@ -839,6 +839,241 @@ pre.report-content {
   to { opacity: 0; transform: translateY(12px) scale(0.96); }
 }
 
+/* --- Phase 8 Components: Hypotheses, Evidence Graph, Timeline, Limitations --- */
+
+/* Hypothesis Cards */
+.hypothesis-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.hypothesis-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.hypothesis-card:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.hypothesis-card[data-status="supported"] {
+  border-left: 4px solid var(--status-completed);
+}
+
+.hypothesis-card[data-status="refuted"] {
+  border-left: 4px solid var(--sev-critical);
+}
+
+.hypothesis-card[data-status="proposed"] {
+  border-left: 4px solid var(--sev-low);
+}
+
+.hypothesis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.hypothesis-statement {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.refutation-box {
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  font-size: 0.875rem;
+  color: #fca5a5;
+}
+
+.refutation-title {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  color: #f87171;
+}
+
+.gap-list {
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.gap-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.gap-item:last-child {
+  border-bottom: none;
+}
+
+/* Evidence Graph View */
+.graph-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn-group {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.btn-filter {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-filter:hover, .btn-filter.active {
+  background: var(--brand-glow);
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.graph-container {
+  position: relative;
+  width: 100%;
+  height: 600px;
+  background-color: #0b1120;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.graph-canvas {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.graph-canvas:active {
+  cursor: grabbing;
+}
+
+.graph-inspector {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 320px;
+  background-color: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+  z-index: 5;
+  font-size: 0.85rem;
+  max-height: 90%;
+  overflow-y: auto;
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  background-color: rgba(30, 41, 59, 0.85);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+  z-index: 5;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Timeline View */
+.timeline-track {
+  position: relative;
+  padding-left: 2rem;
+  margin-top: 1rem;
+}
+
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--brand-primary), var(--border-color));
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -1.65rem;
+  top: 0.25rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--brand-primary);
+  border: 2px solid var(--bg-primary);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}
+
+.timeline-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
 /* Reduced Motion Accessibility */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

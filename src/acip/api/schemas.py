@@ -320,6 +320,23 @@ class HypothesisResponse(BaseModel):
     created_at: dt.datetime
 
 
+class HypothesisDetailResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    display_id: str
+    investigation_id: uuid.UUID
+    statement: str
+    status: HypothesisStatus
+    confidence: float
+    refutation_condition: str
+    agent_run_id: uuid.UUID | None
+    supporting_evidence_ids: list[str] = Field(default_factory=list)
+    contradicting_evidence_ids: list[str] = Field(default_factory=list)
+    gaps: list[HypothesisGapResponse] = Field(default_factory=list)
+    created_at: dt.datetime
+
+
 # --- Model Executions (LLM Calls) --------------------------------------------
 
 
@@ -386,6 +403,7 @@ class InvestigationDetail(BaseModel):
     report: ReportResponse | None
     counts: dict[str, int]
     llm_calls: list[ModelExecutionResponse] = Field(default_factory=list)
+    hypotheses: list[HypothesisDetailResponse] = Field(default_factory=list)
 
 
 class PagedEvidence(BaseModel):

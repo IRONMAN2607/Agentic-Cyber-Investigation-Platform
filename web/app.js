@@ -5,7 +5,14 @@
   let currentToken = localStorage.getItem("acip_token") || "";
   let currentInvId = null;
   let pollInterval = null;
+  let activeEventSource = null;
   let activeTab = "all";
+
+  // Graph state
+  let cachedGraphData = null;
+  let cachedTimelineData = null;
+  let currentGraphFilter = "all";
+  let currentGraphSearch = "";
 
   // --- API Client ---
   async function api(path, options = {}) {
@@ -44,7 +51,7 @@
           }
         }
       } catch {
-        // Ignore body read errors on error responses
+        // Ignore read errors
       }
       throw new Error(errMsg);
     }
@@ -125,6 +132,79 @@
     }
   }
 
+  // --- SSE & Polling Streaming ---
+  function closeEventStream() {
+    if (activeEventSource) {
+      activeEventSource.close();
+      activeEventSource = null;
+    }
+  }
+
+  function setupEventStream(id) {
+    closeEventStream();
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+
+    if (typeof EventSource === "undefined") {
+      startPolling(id);
+      return;
+    }
+
+    try {
+      const es = new EventSource(`${API_BASE}/investigations/${id}/events`);
+      activeEventSource = es;
+
+      es.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === "progress") {
+            const fill = document.querySelector(".progress-bar-fill");
+            if (fill) fill.style.width = `${payload.percent_complete}%`;
+            const header = document.querySelector(".progress-header span:first-child");
+            if (header && payload.running_task) {
+              header.textContent = `Executing task: ${payload.running_task} (${payload.completed_tasks}/${payload.total_tasks})...`;
+            }
+          } else if (payload.type === "done") {
+            closeEventStream();
+            loadInvestigations();
+            selectInvestigation(id);
+          }
+        } catch {
+          // Ignore malformed SSE frames
+        }
+      };
+
+      es.onerror = () => {
+        closeEventStream();
+        startPolling(id);
+      };
+    } catch {
+      startPolling(id);
+    }
+  }
+
+  function startPolling(id) {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(async () => {
+      if (currentInvId !== id) {
+        clearInterval(pollInterval);
+        return;
+      }
+      try {
+        const freshDetail = await api(`/investigations/${id}`);
+        if (freshDetail.investigation.status !== "running") {
+          clearInterval(pollInterval);
+          loadInvestigations();
+          selectInvestigation(id);
+        }
+      } catch {
+        // Continue polling
+      }
+    }, 2000);
+  }
+
   // --- Workspace Detail ---
   async function selectInvestigation(id) {
     currentInvId = id;
@@ -132,41 +212,37 @@
     const ws = document.getElementById("workspace-view");
     ws.innerHTML = `<div style="padding: 3rem; text-align: center; color: var(--text-muted);">Loading investigation workspace...</div>`;
 
+    closeEventStream();
     if (pollInterval) clearInterval(pollInterval);
 
     try {
-      const [detail, evidenceData] = await Promise.all([
+      const [detail, evidenceData, graphData, timelineData] = await Promise.all([
         api(`/investigations/${id}`),
-        api(`/investigations/${id}/evidence?limit=100`).catch(() => ({ items: [] }))
+        api(`/investigations/${id}/evidence?limit=100`).catch(() => ({ items: [] })),
+        api(`/investigations/${id}/graph`).catch(() => ({ entities: [], edges: [] })),
+        api(`/investigations/${id}/timeline`).catch(() => ({ events: [], total: 0 })),
       ]);
 
-      renderWorkspace(detail, evidenceData.items || []);
+      cachedGraphData = graphData;
+      cachedTimelineData = timelineData;
+
+      renderWorkspace(detail, evidenceData.items || [], graphData, timelineData);
 
       if (detail.investigation.status === "running") {
-        pollInterval = setInterval(async () => {
-          if (currentInvId !== id) {
-            clearInterval(pollInterval);
-            return;
-          }
-          const [freshDetail, freshEvidence] = await Promise.all([
-            api(`/investigations/${id}`),
-            api(`/investigations/${id}/evidence?limit=100`).catch(() => ({ items: [] }))
-          ]);
-          renderWorkspace(freshDetail, freshEvidence.items || []);
-          if (freshDetail.investigation.status !== "running") {
-            clearInterval(pollInterval);
-            loadInvestigations();
-          }
-        }, 1500);
+        setupEventStream(id);
       }
     } catch (e) {
       ws.innerHTML = `<div style="padding: 2rem; color: var(--sev-critical);">Error loading workspace: ${escapeHtml(e.message)}</div>`;
     }
   }
 
-  function renderWorkspace(data, evidenceItems = []) {
+  function renderWorkspace(data, evidenceItems = [], graphData = null, timelineData = null) {
     const inv = data.investigation;
     const ws = document.getElementById("workspace-view");
+    const hypotheses = data.hypotheses || [];
+    const entities = (graphData && graphData.entities) || [];
+    const edges = (graphData && graphData.edges) || [];
+    const timelineEvents = (timelineData && timelineData.events) || [];
 
     ws.innerHTML = `
       <!-- Hero Banner -->
@@ -197,7 +273,7 @@
             <span class="pulse-indicator"></span>
           </div>
           <div class="progress-track">
-            <div class="progress-bar-fill"></div>
+            <div class="progress-bar-fill" style="width: 25%;"></div>
           </div>
         </div>
       ` : ''}
@@ -206,6 +282,9 @@
       <div class="workspace-nav">
         <button class="nav-tab ${activeTab === 'all' ? 'active' : ''}" onclick="window.acipSetTab('all')">Overview (All)</button>
         <button class="nav-tab ${activeTab === 'findings' ? 'active' : ''}" onclick="window.acipSetTab('findings')">Findings (${data.findings.length})</button>
+        <button class="nav-tab ${activeTab === 'hypotheses' ? 'active' : ''}" onclick="window.acipSetTab('hypotheses')">Hypotheses &amp; Validation (${hypotheses.length})</button>
+        <button class="nav-tab ${activeTab === 'graph' ? 'active' : ''}" onclick="window.acipSetTab('graph')">Evidence Graph (${entities.length})</button>
+        <button class="nav-tab ${activeTab === 'timeline' ? 'active' : ''}" onclick="window.acipSetTab('timeline')">Timeline (${timelineEvents.length})</button>
         <button class="nav-tab ${activeTab === 'evidence' ? 'active' : ''}" onclick="window.acipSetTab('evidence')">Evidence (${data.counts.evidence || evidenceItems.length})</button>
         <button class="nav-tab ${activeTab === 'trace' ? 'active' : ''}" onclick="window.acipSetTab('trace')">Execution Trace (${data.agent_runs.length + data.tool_runs.length + ((data.llm_calls && data.llm_calls.length) || 0)})</button>
         ${data.report ? `<button class="nav-tab ${activeTab === 'report' ? 'active' : ''}" onclick="window.acipSetTab('report')">Incident Report</button>` : ''}
@@ -228,12 +307,16 @@
           </div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Artifacts Stored</div>
-          <div class="metric-value">${data.counts.artifacts}</div>
-        </div>
-        <div class="metric-card">
           <div class="metric-label">Grounded Findings</div>
           <div class="metric-value">${data.counts.findings}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Competing Hypotheses</div>
+          <div class="metric-value" style="color: #a5b4fc;">${hypotheses.length}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Correlated Entities</div>
+          <div class="metric-value" style="color: #38bdf8;">${entities.length}</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Evidence Items</div>
@@ -272,6 +355,172 @@
               ` : ''}
             </div>
           `).join('')}
+        </div>
+      </div>
+
+      <!-- Competing Hypotheses & Validation Section -->
+      <div id="section-hypotheses" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'hypotheses' ? 'block' : 'none'};">
+        <div class="section-card-header">
+          <span>Competing Hypotheses &amp; Adversarial Validation (${hypotheses.length})</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Strictly grounded with Invariant G3 Falsification Conditions</span>
+        </div>
+        <div class="hypothesis-grid">
+          ${hypotheses.length === 0 ? `
+            <div style="color: var(--text-muted); font-size: 0.9rem; padding: 1.5rem 0;">No hypotheses formulated yet. Reasoning agents formulate competing explanations under Invariant G3 during execution.</div>
+          ` : hypotheses.map(h => {
+            const statusColor = h.status === 'supported' ? 'var(--status-completed)' : (h.status === 'refuted' ? 'var(--sev-critical)' : 'var(--sev-low)');
+            const statusIcon = h.status === 'supported' ? '✓' : (h.status === 'refuted' ? '✕' : '?');
+            return `
+              <div class="hypothesis-card" data-status="${h.status.toLowerCase()}">
+                <div class="hypothesis-header">
+                  <div class="hypothesis-statement">${escapeHtml(h.statement)}</div>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span class="badge" style="background-color: rgba(255,255,255,0.08); color: ${statusColor}; border: 1px solid ${statusColor}; font-weight: 700;">
+                      ${statusIcon} ${h.status.toUpperCase()}
+                    </span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono);">
+                      Conf: ${(h.confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div class="refutation-box">
+                  <div class="refutation-title">⚡ Invariant G3 Falsification Condition:</div>
+                  <div>${escapeHtml(h.refutation_condition)}</div>
+                </div>
+
+                ${(h.supporting_evidence_ids && h.supporting_evidence_ids.length > 0) || (h.contradicting_evidence_ids && h.contradicting_evidence_ids.length > 0) ? `
+                  <div style="display: flex; gap: 1rem; margin-top: 0.75rem; flex-wrap: wrap;">
+                    ${h.supporting_evidence_ids && h.supporting_evidence_ids.length > 0 ? `
+                      <div class="chips-list">
+                        <span style="color: #34d399; font-weight: 600; font-size: 0.8rem;">Supports:</span>
+                        ${h.supporting_evidence_ids.map(eid => `
+                          <button class="chip" style="cursor: pointer;" onclick="window.acipInspectProvenance('${inv.id}', '${eid}')">
+                            🔍 ${eid.slice(0, 8)}...
+                          </button>
+                        `).join('')}
+                      </div>
+                    ` : ''}
+                    ${h.contradicting_evidence_ids && h.contradicting_evidence_ids.length > 0 ? `
+                      <div class="chips-list">
+                        <span style="color: #f87171; font-weight: 600; font-size: 0.8rem;">Contradicts (Refutes):</span>
+                        ${h.contradicting_evidence_ids.map(eid => `
+                          <button class="chip" style="cursor: pointer; border-color: rgba(239, 68, 68, 0.4);" onclick="window.acipInspectProvenance('${inv.id}', '${eid}')">
+                            🔍 ${eid.slice(0, 8)}...
+                          </button>
+                        `).join('')}
+                      </div>
+                    ` : ''}
+                  </div>
+                ` : ''}
+
+                ${h.gaps && h.gaps.length > 0 ? `
+                  <div class="gap-list">
+                    <div style="font-weight: 600; color: #f59e0b; margin-bottom: 0.35rem; font-size: 0.8rem;">Declared Investigative Gaps:</div>
+                    ${h.gaps.map(g => `
+                      <div class="gap-item">
+                        <span>${escapeHtml(g.description)}</span>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                          ${g.required_tool ? `<code style="font-size: 0.75rem;">Tool: ${escapeHtml(g.required_tool)}</code>` : ''}
+                          <span class="badge ${g.resolved ? 'badge-completed' : 'badge-created'}" style="font-size: 0.7rem;">${g.resolved ? 'Resolved' : 'Pending'}</span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Evidence Graph Section -->
+      <div id="section-graph" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'graph' ? 'block' : 'none'};">
+        <div class="section-card-header">
+          <span>Evidence Graph &amp; Entity Correlation (${entities.length} entities, ${edges.length} edges)</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Depth-bounded BFS correlation over canonical entity nodes</span>
+        </div>
+        <div class="graph-toolbar">
+          <div class="filter-btn-group" id="graph-filters">
+            <button class="btn-filter ${currentGraphFilter === 'all' ? 'active' : ''}" onclick="window.acipFilterGraph('all')">All</button>
+            <button class="btn-filter ${currentGraphFilter === 'ip' ? 'active' : ''}" onclick="window.acipFilterGraph('ip')">IPs</button>
+            <button class="btn-filter ${currentGraphFilter === 'user' ? 'active' : ''}" onclick="window.acipFilterGraph('user')">Users</button>
+            <button class="btn-filter ${currentGraphFilter === 'host' ? 'active' : ''}" onclick="window.acipFilterGraph('host')">Hosts</button>
+            <button class="btn-filter ${currentGraphFilter === 'domain' ? 'active' : ''}" onclick="window.acipFilterGraph('domain')">Domains</button>
+            <button class="btn-filter ${currentGraphFilter === 'hash' ? 'active' : ''}" onclick="window.acipFilterGraph('hash')">Hashes</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" id="graph-search" placeholder="Search entity..." class="form-control" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; width: 140px;" oninput="window.acipSearchGraph(this.value)" value="${escapeHtml(currentGraphSearch)}">
+            <button class="btn btn-outline btn-sm" onclick="window.acipResetGraph()">Reset View</button>
+          </div>
+        </div>
+
+        <div class="graph-container" id="graph-container">
+          <div id="graph-render-area" style="width: 100%; height: 100%;">
+            ${renderSvgGraph(graphData, inv.id, currentGraphFilter, currentGraphSearch)}
+          </div>
+          <div id="graph-inspector-panel" class="graph-inspector" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong id="inspector-title" style="color: var(--brand-primary);">Entity Details</strong>
+              <button class="btn btn-outline btn-sm" style="padding: 0.1rem 0.4rem;" onclick="document.getElementById('graph-inspector-panel').style.display='none'">✕</button>
+            </div>
+            <div id="inspector-body"></div>
+          </div>
+          <div class="graph-legend">
+            <div class="legend-item"><span class="legend-dot" style="background-color: #38bdf8;"></span> IP</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color: #34d399;"></span> User</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color: #818cf8;"></span> Host</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color: #f59e0b;"></span> Domain</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color: #ec4899;"></span> Hash</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forensic Timeline Section -->
+      <div id="section-timeline" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'timeline' ? 'block' : 'none'};">
+        <div class="section-card-header">
+          <span>Correlated Forensic Timeline (${timelineEvents.length} events)</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Chronologically ordered events across all evidence streams</span>
+        </div>
+        <div class="timeline-track">
+          ${timelineEvents.length === 0 ? `
+            <div style="color: var(--text-muted); font-size: 0.9rem; padding: 1.5rem 0;">No chronological events recorded yet. Parsed log items and network flows will appear here.</div>
+          ` : timelineEvents.map(ev => {
+            const timeConfBadge = ev.time_confidence === 'EXACT'
+              ? `<span class="badge" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;">EXACT</span>`
+              : `<span class="badge" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b;">APPROXIMATE</span>`;
+            return `
+              <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                  <div class="timeline-header">
+                    <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                      <strong style="color: var(--brand-primary); font-family: var(--font-mono); font-size: 0.85rem;">
+                        ${ev.observed_at ? new Date(ev.observed_at).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'Timestamp N/A'}
+                      </strong>
+                      ${timeConfBadge}
+                      <span class="badge badge-info">${escapeHtml(ev.kind)}</span>
+                      <span style="font-size: 0.75rem; color: var(--text-muted);">Tool: <strong>${escapeHtml(ev.source_tool)}</strong></span>
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="window.acipInspectProvenance('${inv.id}', '${ev.evidence_id}')">
+                      🔍 Provenance
+                    </button>
+                  </div>
+                  <div style="font-size: 0.85rem; margin: 0.4rem 0; font-family: var(--font-mono); color: #e2e8f0;">
+                    ${escapeHtml(ev.summary)}
+                  </div>
+                  ${ev.entities && ev.entities.length > 0 ? `
+                    <div class="chips-list" style="margin-top: 0.4rem;">
+                      <span style="color: var(--text-muted); font-size: 0.75rem;">Correlated Entities:</span>
+                      ${ev.entities.map(ent => `
+                        <span class="chip" style="font-size: 0.75rem;">${escapeHtml(ent.type)}: <strong>${escapeHtml(ent.value)}</strong></span>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
 
@@ -393,6 +642,190 @@
     `;
   }
 
+  // --- SVG Graph Renderer ---
+  function renderSvgGraph(graphData, invId, filterType = "all", searchQuery = "") {
+    if (!graphData || !graphData.entities || graphData.entities.length === 0) {
+      return `<div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">No graph entities correlated yet. Run correlation agent or investigate multi-source telemetry to populate the graph.</div>`;
+    }
+
+    let entities = graphData.entities;
+    if (filterType !== "all") {
+      entities = entities.filter(e => e.type === filterType);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      entities = entities.filter(e =>
+        e.value_normalized.toLowerCase().includes(q) ||
+        (e.value_raw_first_seen && e.value_raw_first_seen.toLowerCase().includes(q))
+      );
+    }
+
+    if (entities.length === 0) {
+      return `<div style="padding: 3rem 2rem; text-align: center; color: var(--text-muted);">No entities match filter "${escapeHtml(filterType)}" with search "${escapeHtml(searchQuery)}".</div>`;
+    }
+
+    const entityIds = new Set(entities.map(e => e.id));
+    const edges = (graphData.edges || []).filter(e => entityIds.has(e.src_entity_id) && entityIds.has(e.dst_entity_id));
+
+    const width = 850;
+    const height = 550;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    const colors = {
+      ip: "#38bdf8",
+      user: "#34d399",
+      host: "#818cf8",
+      domain: "#f59e0b",
+      hash: "#ec4899",
+      url: "#a78bfa",
+      other: "#94a3b8"
+    };
+
+    // Calculate node positions in circle
+    const positions = {};
+    const n = entities.length;
+    const radius = Math.min(220, Math.max(80, 50 + n * 16));
+
+    entities.forEach((ent, idx) => {
+      if (n === 1) {
+        positions[ent.id] = { x: cx, y: cy };
+      } else {
+        const angle = (2 * Math.PI * idx) / n;
+        positions[ent.id] = {
+          x: cx + radius * Math.cos(angle),
+          y: cy + radius * Math.sin(angle)
+        };
+      }
+    });
+
+    let edgesSvg = "";
+    edges.forEach(edge => {
+      const p1 = positions[edge.src_entity_id];
+      const p2 = positions[edge.dst_entity_id];
+      if (!p1 || !p2) return;
+
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+
+      edgesSvg += `
+        <g class="graph-edge-group" style="cursor: pointer;" onclick="window.acipInspectProvenance('${invId}', '${edge.evidence_id}')">
+          <line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" />
+          <rect x="${midX - 35}" y="${midY - 8}" width="70" height="16" fill="#0f172a" rx="3" stroke="#334155" stroke-width="1"/>
+          <text x="${midX}" y="${midY + 4}" fill="#94a3b8" font-size="9" text-anchor="middle" font-family="monospace">${escapeHtml(edge.relation)}</text>
+        </g>
+      `;
+    });
+
+    let nodesSvg = "";
+    entities.forEach(ent => {
+      const p = positions[ent.id];
+      const color = colors[ent.type] || colors.other;
+      const label = ent.value_normalized.length > 14 ? ent.value_normalized.slice(0, 12) + "…" : ent.value_normalized;
+
+      nodesSvg += `
+        <g class="graph-node-group" style="cursor: pointer;" onclick="window.acipInspectGraphNode('${ent.id}')">
+          <circle cx="${p.x}" cy="${p.y}" r="18" fill="#1e293b" stroke="${color}" stroke-width="3" />
+          <text x="${p.x}" y="${p.y + 4}" fill="${color}" font-size="10" font-weight="700" text-anchor="middle" font-family="monospace">
+            ${ent.type.slice(0, 3).toUpperCase()}
+          </text>
+          <text x="${p.x}" y="${p.y + 32}" fill="#f8fafc" font-size="11" text-anchor="middle" font-weight="500">
+            ${escapeHtml(label)}
+          </text>
+        </g>
+      `;
+    });
+
+    return `
+      <svg class="graph-canvas" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="24" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+          </marker>
+        </defs>
+        ${edgesSvg}
+        ${nodesSvg}
+      </svg>
+    `;
+  }
+
+  // --- Graph Interactivity Handlers ---
+  window.acipFilterGraph = (type) => {
+    currentGraphFilter = type;
+    const filterButtons = document.querySelectorAll("#graph-filters .btn-filter");
+    filterButtons.forEach(btn => {
+      if (btn.textContent.toLowerCase().includes(type) || (type === "all" && btn.textContent.toLowerCase().includes("all"))) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+    const renderArea = document.getElementById("graph-render-area");
+    if (renderArea && cachedGraphData && currentInvId) {
+      renderArea.innerHTML = renderSvgGraph(cachedGraphData, currentInvId, currentGraphFilter, currentGraphSearch);
+    }
+  };
+
+  window.acipSearchGraph = (query) => {
+    currentGraphSearch = query;
+    const renderArea = document.getElementById("graph-render-area");
+    if (renderArea && cachedGraphData && currentInvId) {
+      renderArea.innerHTML = renderSvgGraph(cachedGraphData, currentInvId, currentGraphFilter, currentGraphSearch);
+    }
+  };
+
+  window.acipResetGraph = () => {
+    currentGraphFilter = "all";
+    currentGraphSearch = "";
+    const searchInput = document.getElementById("graph-search");
+    if (searchInput) searchInput.value = "";
+    window.acipFilterGraph("all");
+  };
+
+  window.acipInspectGraphNode = (nodeId) => {
+    if (!cachedGraphData || !cachedGraphData.entities) return;
+    const ent = cachedGraphData.entities.find(e => e.id === nodeId);
+    if (!ent) return;
+
+    const inspector = document.getElementById("graph-inspector-panel");
+    const body = document.getElementById("inspector-body");
+    const title = document.getElementById("inspector-title");
+    if (!inspector || !body) return;
+
+    const connectedEdges = (cachedGraphData.edges || []).filter(e => e.src_entity_id === nodeId || e.dst_entity_id === nodeId);
+
+    title.textContent = `${ent.type.toUpperCase()} Entity`;
+    body.innerHTML = `
+      <div style="margin-bottom: 0.5rem;">
+        <div>Normalized Value:</div>
+        <code style="word-break: break-all; color: var(--brand-primary);">${escapeHtml(ent.value_normalized)}</code>
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <div>Raw First Seen:</div>
+        <code style="word-break: break-all;">${escapeHtml(ent.value_raw_first_seen || ent.value_normalized)}</code>
+      </div>
+      <div style="margin-bottom: 0.75rem;">
+        <span>Observation Count: <strong>${ent.observation_count}</strong></span>
+      </div>
+      <div style="border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+        <strong>Connected Relationships (${connectedEdges.length}):</strong>
+        ${connectedEdges.length === 0 ? `<div style="color: var(--text-muted); margin-top: 0.25rem;">Isolated node</div>` : `
+          <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+            ${connectedEdges.map(e => `
+              <li style="margin-bottom: 0.25rem;">
+                <code>${escapeHtml(e.relation)}</code>
+                <button class="chip" style="cursor: pointer; padding: 0.1rem 0.35rem; font-size: 0.7rem;" onclick="window.acipInspectProvenance('${currentInvId}', '${e.evidence_id}')">
+                  🔍 Provenance
+                </button>
+              </li>
+            `).join('')}
+          </ul>
+        `}
+      </div>
+    `;
+    inspector.style.display = "block";
+  };
+
   // --- Simple Markdown Formatter ---
   function renderMarkdown(md) {
     if (!md) return "";
@@ -479,6 +912,7 @@
     }
     try {
       await api(`/investigations/${invId}?purge=true`, { method: "DELETE" });
+      closeEventStream();
       if (pollInterval) {
         clearInterval(pollInterval);
         pollInterval = null;
@@ -503,7 +937,6 @@
       const ev = prov.evidence;
       const tool = prov.tool_run;
       const art = prov.artifact;
-      const ag = prov.agent_run;
 
       container.innerHTML = `
         <div style="background-color: var(--bg-primary); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
@@ -550,12 +983,61 @@
     }
   };
 
+  // --- Capabilities & Limitations View ---
+  window.acipOpenAbout = async () => {
+    const modal = document.getElementById("modal-about");
+    const container = document.getElementById("about-details");
+    if (!modal || !container) return;
+    container.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted);">Fetching capabilities from API...</div>`;
+    modal.showModal();
+
+    try {
+      const caps = await api("/capabilities");
+      container.innerHTML = `
+        <div style="background-color: var(--bg-primary); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; color: var(--brand-primary); margin-bottom: 0.25rem;">Platform Runtime &amp; Orchestration</div>
+          <div>Environment: <code>${escapeHtml(caps.environment)}</code></div>
+          <div>Active Planner: <strong>${escapeHtml(caps.planner)}</strong></div>
+        </div>
+
+        <div style="background-color: var(--bg-primary); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; color: #34d399; margin-bottom: 0.25rem;">Active Deterministic Tools (Evidence Producers)</div>
+          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            ${(caps.tools || []).map(t => `<span class="badge badge-low" style="font-family: var(--font-mono);">${escapeHtml(t)}</span>`).join('')}
+          </div>
+        </div>
+
+        <div style="background-color: var(--bg-primary); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; color: #a5b4fc; margin-bottom: 0.25rem;">Reasoning &amp; Analysis Agents</div>
+          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            ${(caps.agents || []).map(a => `<span class="badge badge-inference" style="font-family: var(--font-mono);">${escapeHtml(a)}</span>`).join('')}
+          </div>
+        </div>
+
+        <div style="background-color: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); padding: 1rem; border-radius: 6px;">
+          <div style="font-weight: 700; color: #f87171; margin-bottom: 0.4rem;">Honest Limitations (Declared in core/limitations.py)</div>
+          <ul style="padding-left: 1.25rem; font-size: 0.85rem; color: #fca5a5; display: flex; flex-direction: column; gap: 0.25rem;">
+            ${(caps.not_implemented || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div style="background-color: var(--bg-primary); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-secondary);">
+          <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">Operating Boundary Guarantee</div>
+          <div>${escapeHtml(caps.operating_boundary || 'Single-node, local SQLite/PostgreSQL deployment. No remote unverified code execution.')}</div>
+        </div>
+      `;
+    } catch (e) {
+      container.innerHTML = `<div style="color: var(--sev-critical); padding: 1rem;">Failed to fetch capabilities: ${escapeHtml(e.message)}</div>`;
+    }
+  };
+
   // --- Event Listeners ---
   document.getElementById("btn-login-modal").addEventListener("click", () => {
     document.getElementById("modal-login").showModal();
   });
 
   document.getElementById("btn-logout").addEventListener("click", () => {
+    closeEventStream();
     setAuth("", null);
     document.getElementById("inv-list").innerHTML = "";
     document.getElementById("workspace-view").innerHTML = `<div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">Please log in to continue.</div>`;

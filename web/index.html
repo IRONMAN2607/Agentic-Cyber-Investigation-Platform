@@ -14,6 +14,7 @@
     </div>
     <div class="nav-actions">
       <span id="health-badge" class="badge badge-completed">System: OK</span>
+      <button id="btn-about-modal" class="btn btn-outline btn-sm" onclick="window.acipOpenAbout()">About / Limitations</button>
       <span id="user-display" class="user-badge">Not Logged In</span>
       <button id="btn-login-modal" class="btn btn-outline btn-sm">Login</button>
       <button id="btn-logout" class="btn btn-outline btn-sm" style="display: none;">Logout</button>
@@ -166,9 +167,23 @@
     </div>
   </dialog>
 
+  <!-- Native HTML Dialog: About & Honest Limitations -->
+  <dialog id="modal-about" style="max-width: 720px; width: 90%;">
+    <div class="dialog-header">
+      <h3 class="dialog-title">Platform Capabilities & Honest Limitations</h3>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('modal-about').close()">✕</button>
+    </div>
+    <div id="about-details" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.9rem; max-height: 70vh; overflow-y: auto;">
+      Loading declared capabilities and limitations...
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('modal-about').close()">Close</button>
+    </div>
+  </dialog>
+
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-  <script src="app.js?v=2.3"></script>
+  <script src="app.js?v=2.4"></script>
 </body>
 </html>

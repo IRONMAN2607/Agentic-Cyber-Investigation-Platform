@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
+import json
 import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, cast
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +31,8 @@ from acip.api.schemas import (
     EvidenceResponse,
     FindingResponse,
     GraphResponse,
+    HypothesisDetailResponse,
+    HypothesisGapResponse,
     InvestigationCreate,
     InvestigationDetail,
     InvestigationProgress,
@@ -58,6 +63,9 @@ from acip.db.models import (
     Entity,
     Evidence,
     Finding,
+    Hypothesis,
+    HypothesisEvidence,
+    HypothesisGap,
     Investigation,
     ModelExecution,
     Report,
@@ -188,6 +196,7 @@ async def get_investigation_detail(
         .select_from(Evidence)
         .where(Evidence.investigation_id == investigation_id)
     )
+    hypotheses_detail = await _fetch_hypotheses_detail(session, investigation_id)
 
     return InvestigationDetail(
         investigation=InvestigationResponse.model_validate(investigation),
@@ -203,9 +212,64 @@ async def get_investigation_detail(
             "tool_runs": len(tool_runs),
             "evidence": int(evidence_count or 0),
             "llm_calls": len(llm_calls),
+            "hypotheses": len(hypotheses_detail),
         },
         llm_calls=[ModelExecutionResponse.model_validate(row) for row in llm_calls],
+        hypotheses=hypotheses_detail,
     )
+
+
+async def _fetch_hypotheses_detail(
+    session: AsyncSession, investigation_id: uuid.UUID
+) -> list[HypothesisDetailResponse]:
+    hyp_stmt = (
+        sa.select(Hypothesis)
+        .where(Hypothesis.investigation_id == investigation_id)
+        .order_by(Hypothesis.created_at)
+    )
+    hypotheses = list((await session.scalars(hyp_stmt)).all())
+    if not hypotheses:
+        return []
+
+    hyp_ids = [h.id for h in hypotheses]
+    he_stmt = sa.select(HypothesisEvidence).where(HypothesisEvidence.hypothesis_id.in_(hyp_ids))
+    he_rows = list((await session.scalars(he_stmt)).all())
+
+    gap_stmt = sa.select(HypothesisGap).where(HypothesisGap.hypothesis_id.in_(hyp_ids))
+    gap_rows = list((await session.scalars(gap_stmt)).all())
+
+    result: list[HypothesisDetailResponse] = []
+    for h in hypotheses:
+        supp_ids = [
+            str(he.evidence_id)
+            for he in he_rows
+            if he.hypothesis_id == h.id and he.role == "supports"
+        ]
+        contra_ids = [
+            str(he.evidence_id)
+            for he in he_rows
+            if he.hypothesis_id == h.id and he.role == "contradicts"
+        ]
+        gaps = [
+            HypothesisGapResponse.model_validate(g) for g in gap_rows if g.hypothesis_id == h.id
+        ]
+        result.append(
+            HypothesisDetailResponse(
+                id=h.id,
+                display_id=h.display_id,
+                investigation_id=h.investigation_id,
+                statement=h.statement,
+                status=h.status_enum,
+                confidence=h.confidence,
+                refutation_condition=h.refutation_condition,
+                agent_run_id=h.agent_run_id,
+                supporting_evidence_ids=supp_ids,
+                contradicting_evidence_ids=contra_ids,
+                gaps=gaps,
+                created_at=h.created_at,
+            )
+        )
+    return result
 
 
 @router.patch("/{investigation_id}", response_model=InvestigationResponse)
@@ -977,6 +1041,92 @@ async def get_finding_subgraph(
         entities=[EntityResponse.model_validate(e) for e in subgraph.entities],
         edges=[EntityEdgeResponse.model_validate(e) for e in subgraph.edges],
         truncated=subgraph.truncated,
+    )
+
+
+@router.get(
+    "/{investigation_id}/hypotheses",
+    response_model=list[HypothesisDetailResponse],
+)
+async def list_investigation_hypotheses(
+    investigation: LoadedInvestigation,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[HypothesisDetailResponse]:
+    """List competing hypotheses, refutation conditions, and gaps."""
+    return await _fetch_hypotheses_detail(session, investigation.id)
+
+
+@router.get("/{investigation_id}/events")
+async def stream_investigation_events(
+    investigation: LoadedInvestigation,
+    services: Annotated[Services, Depends(get_services)],
+) -> StreamingResponse:
+    """Server-Sent Events (SSE) stream for real-time investigation progress."""
+    inv_id = investigation.id
+
+    async def event_generator() -> AsyncIterator[str]:
+        # Send initial connection handshake
+        init_payload = {"type": "connected", "investigation_id": str(inv_id)}
+        yield f"data: {json.dumps(init_payload)}\n\n"
+        last_status = None
+        last_task = None
+        consecutive_terminal_checks = 0
+
+        while True:
+            await asyncio.sleep(1.0)
+            async with services.database.session() as s:
+                inv = await s.scalar(sa.select(Investigation).where(Investigation.id == inv_id))
+                if inv is None:
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'not found'})}\n\n"
+                    break
+
+                tasks = list(
+                    (
+                        await s.scalars(
+                            sa.select(TaskRun).where(TaskRun.investigation_id == inv_id)
+                        )
+                    ).all()
+                )
+                running_task = next(
+                    (t.task_type for t in tasks if t.status == TaskStatus.RUNNING.value),
+                    None,
+                )
+
+                if inv.status != last_status or running_task != last_task:
+                    last_status = inv.status
+                    last_task = running_task
+                    completed = sum(1 for t in tasks if t.status == TaskStatus.SUCCEEDED.value)
+                    total = len(tasks)
+                    percent = (
+                        (completed / total * 100.0)
+                        if total > 0
+                        else (100.0 if inv.status_enum.terminal else 0.0)
+                    )
+                    payload = {
+                        "type": "progress",
+                        "status": inv.status,
+                        "running_task": running_task,
+                        "completed_tasks": completed,
+                        "total_tasks": total,
+                        "percent_complete": round(percent, 2),
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+
+                if inv.status_enum.terminal:
+                    consecutive_terminal_checks += 1
+                    if consecutive_terminal_checks >= 2:
+                        done_payload = {"type": "done", "status": inv.status}
+                        yield f"data: {json.dumps(done_payload)}\n\n"
+                        break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

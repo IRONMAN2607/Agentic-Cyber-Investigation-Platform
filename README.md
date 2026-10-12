@@ -20,11 +20,11 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 
 ## Status
 
-**Phases 0–7 verified. Phase 5 (Evidence Graph & Correlation Engine), Phase 6 (Model Abstraction & Reasoning Provider), and Phase 7 (Reasoning Agents, Adversarial Validation & Adaptive Planning) are complete. Phase 8 (Frontend Expansion) is unblocked.** [docs/roadmap.md](docs/roadmap.md) is the authority on phase numbering.
+**Phases 0–8 verified. Phase 5 (Evidence Graph & Correlation Engine), Phase 6 (Model Abstraction & Reasoning Provider), Phase 7 (Reasoning Agents, Adversarial Validation & Adaptive Planning), and Phase 8 (Frontend Expansion: Evidence Graph, Interactive Timeline, Hypotheses & Validation Panel, Real-time SSE streaming, Honest Limitations Modal) are complete. Phase 9 (Evaluation & Benchmark Harness) is unblocked.** [docs/roadmap.md](docs/roadmap.md) is the authority on phase numbering.
 
 | Quality Gate | Status |
 |---|---|
-| Tests | **210 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
+| Tests | **211 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
 | Lint | **0 ruff errors** (`ruff check src tests`) |
 | Formatting | **100% formatted** across 144 files (`ruff format --check src tests`) |
 | Types | **0 mypy errors** across 144 source files (`mypy src tests`) |
@@ -32,11 +32,11 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 | Orchestrator Agent & Planner | `OrchestratorAgent` coordinates lifecycle, `AdaptivePlanner` dynamically plans investigative workflows based on artifact types, tool capabilities, and investigation progression |
 | Reasoning & Validation Agents | `HypothesisAgent` (competing explanations with Invariant G3 refutation conditions and gap detection), `ReasoningAgent` (multi-hop graph attack chain synthesis), `ValidationAgent` (adversarial review with bounded execution loops), Risk assessment with attributed model opinion |
 | Evidence Graph Engine | In-database graph (`entities`, `entity_edges`), Tier-1 Canonical Correlation (`CorrelationAgent`), cycle-safe depth-bounded BFS traversal (`GraphTraversal`), and subgraph extraction |
+| Frontend Workspace | **Interactive multi-tab dashboard** in `web/` served directly by FastAPI: Evidence Graph SVG canvas, Correlated Forensic Timeline, Competing Hypotheses & Validation, Server-Sent Events (SSE) streaming with polling fallback, honest capabilities & limitations disclosure modal |
 | Security Invariants | Grounding invariants G0–G4, Invariant G7 (MITRE ATT&CK catalog bounds), append-only immutability (incl. bulk DML), provenance integrity, token safety, role authz matrix, request rate limits, anti-SSRF protection, magic-byte intake validation, T1 sandbox isolation (no `shell=True`) |
 | Model Abstraction & Routing | `ModelRouter`, `RoutingPolicy`, OpenAI-compatible `NvidiaNIMProvider` (Nemotron, DeepSeek R1), local `CyberReasoningProvider` dynamic evaluation engine, Pydantic structured output repair, deterministic `ReplayProvider` test double |
 | Active Phase 4 Capabilities | Deterministic Web Server Access Log Parser (`web_server_log_parser`), Linux Auth Log Parser (`auth_log_parser`), PCAP Packet Capture Parser (`pcap_parser`), Threat Intelligence adapter (`threat_intel`), IOC Extractor (`ioc_extractor`), MITRE ATT&CK Mapping Agent (`mitre`), Tier 1 Subprocess Sandbox |
-| Active Focus (Phase 8) | Frontend expansion: Evidence Graph visualization, interactive Timeline, and Hypothesis/Validation management |
-| Frontend | **Interactive dashboard** in `web/` served directly by FastAPI |
+| Active Focus (Phase 9) | Evaluation harness: benchmark datasets, baselines A–C, ablations 1–4, and reproduction runner |
 
 `GET /capabilities` and `acip capabilities` report what this deployment can actually do, and
 `src/acip/core/limitations.py` is the single source for what it cannot. Both are wired into the

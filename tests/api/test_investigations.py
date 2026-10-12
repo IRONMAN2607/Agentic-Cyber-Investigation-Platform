@@ -105,3 +105,38 @@ async def test_investigation_crud_and_lifecycle(
     report_data = resp_report.json()
     assert "# Investigation Report" in report_data["content"]
     assert "203.0.113.55" in report_data["content"]
+
+    # 9. Hypotheses endpoint & detail check
+    assert "hypotheses" in detail
+    resp_hyp = await client.get(
+        f"/api/v1/investigations/{inv_id}/hypotheses",
+        headers=auth_headers[Role.VIEWER],
+    )
+    assert resp_hyp.status_code == 200
+    assert isinstance(resp_hyp.json(), list)
+
+    # 10. Evidence Graph & Timeline endpoints
+    resp_graph = await client.get(
+        f"/api/v1/investigations/{inv_id}/graph",
+        headers=auth_headers[Role.VIEWER],
+    )
+    assert resp_graph.status_code == 200
+    assert "entities" in resp_graph.json()
+    assert "edges" in resp_graph.json()
+
+    resp_timeline = await client.get(
+        f"/api/v1/investigations/{inv_id}/timeline",
+        headers=auth_headers[Role.VIEWER],
+    )
+    assert resp_timeline.status_code == 200
+    assert "events" in resp_timeline.json()
+
+    # 11. Real-time Events SSE Stream handshake
+    resp_events = await client.get(
+        f"/api/v1/investigations/{inv_id}/events",
+        headers=auth_headers[Role.VIEWER],
+    )
+    assert resp_events.status_code == 200
+    assert resp_events.headers["content-type"].startswith("text/event-stream")
+    # Verify stream emitted event data
+    assert "data: " in resp_events.text
