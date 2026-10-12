@@ -98,6 +98,7 @@ src/acip/
 
 | Doc | Contents |
 |---|---|
+| [user-guide.md](docs/user-guide.md) | Comprehensive user manual & learning guide (top to bottom) |
 | [architecture.md](docs/architecture.md) | System architecture, tech stack, layering, directory structure |
 | [agents.md](docs/agents.md) | Agent roster, contracts, orchestration and planning |
 | [evidence-model.md](docs/evidence-model.md) | Evidence, assertion classes, grounding invariants G0–G4 |
