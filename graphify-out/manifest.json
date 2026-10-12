@@ -312,9 +312,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1791819943.8509307,
-    "seen": 1791821572.0256827,
-    "ast_hash": "36dfc94e6ab28c7e70333de4c04c2412",
+    "mtime": 1791823547.8040054,
+    "seen": 1791823576.1002204,
+    "ast_hash": "61d8ef065ff947e7992450c4028af499",
     "semantic_hash": ""
   },
   "docs/agents.md": {
@@ -390,9 +390,9 @@
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
-    "mtime": 1791821620.4335191,
-    "seen": 1791821853.8694067,
-    "ast_hash": "b0371319041912b35b4dce911008a4ce",
+    "mtime": 1791821868.0426118,
+    "seen": 1791823576.1002204,
+    "ast_hash": "7033efd48c7c27d4eabfe76d02b539eb",
     "semantic_hash": ""
   },
   "docs/security.md": {
@@ -1215,6 +1215,12 @@
     "mtime": 1791821771.864318,
     "seen": 1791821853.8694067,
     "ast_hash": "698d3fafba9692ec4fc3d83df10de05f",
+    "semantic_hash": ""
+  },
+  "docs/user-guide.md": {
+    "mtime": 1791822933.3635087,
+    "seen": 1791823576.1002204,
+    "ast_hash": "0349e6ec8108d96e780fc39c79183b4f",
     "semantic_hash": ""
   }
 }
