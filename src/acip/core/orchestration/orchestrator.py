@@ -496,8 +496,8 @@ class OrchestratorAgent:
                                     decl_kind = ArtifactKind.LINUX_AUTH_LOG
                                     fname = "target_content.log"
                                 case TargetType.PCAP:
-                                    decl_kind = ArtifactKind.PCAP
-                                    fname = "target_capture.pcap"
+                                    decl_kind = ArtifactKind.GENERIC_TEXT
+                                    fname = "target_capture_info.txt"
                                 case TargetType.URL:
                                     decl_kind = ArtifactKind.GENERIC_TEXT
                                     fname = "target_url.txt"

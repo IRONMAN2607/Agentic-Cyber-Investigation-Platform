@@ -7,6 +7,7 @@ hashes, files, logs, and PCAPs).
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import re
 import urllib.parse
@@ -24,30 +25,61 @@ _SHA512_RE = re.compile(r"^[0-9a-fA-F]{128}$")
 _DOMAIN_LABEL_RE = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
 
 
+def _undefang(value: str) -> str:
+    """Normalize defanged indicators and strip enclosing formatting quotes."""
+    cleaned = value.strip().strip("'\"<>")
+    return cleaned.replace("[.]", ".").replace("(.)", ".").replace("[:]", ":")
+
+
 def validate_ip(value: str) -> str:
     """Validate and canonicalize an IPv4 or IPv6 address string.
 
-    Returns the canonical string representation (e.g. collapsing leading zeros,
-    canonical IPv6 format).
+    Tolerates defanging (e.g. 1.2.3[.]4), ports, protocol schemes, and CIDRs.
+    Returns the canonical string representation.
     """
-    candidate = value.strip()
+    candidate = _undefang(value)
     if not candidate:
         raise ValidationError("IP address must not be empty")
+
+    # If full URL pasted into IP field, extract hostname
+    if "://" in candidate:
+        with contextlib.suppress(Exception):
+            parsed = urllib.parse.urlsplit(candidate)
+            candidate = parsed.hostname or candidate
+
+    # IPv6 with port: [2001:db8::1]:8080
+    if candidate.startswith("[") and "]" in candidate:
+        candidate = candidate[1 : candidate.index("]")]
+    elif ":" in candidate and candidate.count(":") == 1:
+        # IPv4 with port: 198.51.100.23:8080
+        candidate = candidate.split(":", 1)[0]
+
+    # CIDR network notation: 198.51.100.0/24 -> 198.51.100.0
+    if "/" in candidate:
+        with contextlib.suppress(ValueError):
+            net = ipaddress.ip_network(candidate, strict=False)
+            return str(net.network_address)
+
     try:
         addr = ipaddress.ip_address(candidate)
         return str(addr)
     except ValueError as exc:
-        raise ValidationError(f"invalid IP address '{candidate}': {exc}") from exc
+        raise ValidationError(f"invalid IP address '{value}': {exc}") from exc
 
 
 def validate_hash(value: str) -> str:
     """Validate a cryptographic hash (MD5, SHA-1, SHA-256, or SHA-512).
 
+    Tolerates algorithm prefixes (e.g. md5:, sha256:) and casing.
     Returns the lowercase normalized hash string.
     """
-    candidate = value.strip().lower()
+    candidate = _undefang(value).lower()
     if not candidate:
         raise ValidationError("hash must not be empty")
+
+    candidate = re.sub(
+        r"^(?:md5|sha1|sha256|sha512|hash)\s*:\s*", "", candidate, flags=re.IGNORECASE
+    )
 
     if (
         _MD5_RE.match(candidate)
@@ -58,7 +90,7 @@ def validate_hash(value: str) -> str:
         return candidate
 
     raise ValidationError(
-        f"invalid cryptographic hash '{candidate}': must be 32 (MD5), 40 (SHA-1), "
+        f"invalid cryptographic hash '{value}': must be 32 (MD5), 40 (SHA-1), "
         "64 (SHA-256), or 128 (SHA-512) hexadecimal characters"
     )
 
@@ -66,9 +98,31 @@ def validate_hash(value: str) -> str:
 def validate_domain(value: str) -> str:
     """Validate and canonicalize a fully qualified domain name.
 
+    Tolerates defanging (e.g. evil[.]com), full URLs, ports, and trailing slashes.
     Returns the lowercased domain with trailing dot stripped.
     """
-    candidate = value.strip().rstrip(".").lower()
+    candidate = _undefang(value)
+    if not candidate:
+        raise ValidationError("domain name must not be empty")
+
+    # Normalize defanged protocols if present
+    candidate = re.sub(r"^hxxps?://", "http://", candidate, flags=re.IGNORECASE)
+
+    # If full URL pasted, extract hostname
+    if "://" in candidate:
+        with contextlib.suppress(Exception):
+            parsed = urllib.parse.urlsplit(candidate)
+            candidate = parsed.hostname or candidate
+
+    # Strip paths or queries if entered like evil.com/login?foo=1
+    if "/" in candidate:
+        candidate = candidate.split("/", 1)[0]
+
+    # Strip port if present
+    if ":" in candidate:
+        candidate = candidate.split(":", 1)[0]
+
+    candidate = candidate.strip().rstrip(".").lower()
     if not candidate:
         raise ValidationError("domain name must not be empty")
     if len(candidate) > 253:
@@ -92,13 +146,25 @@ def validate_domain(value: str) -> str:
 def validate_url(value: str) -> str:
     """Validate and canonicalize a URL structure.
 
-    Enforces RFC 3986 compliance and http/https scheme allowlist.
+    Tolerates URLs without schemes (defaults to https://), defanged schemes (hxxp://, hxxps://),
+    and normalizes path and casing. Enforces RFC 3986 compliance and http/https scheme allowlist.
     """
-    candidate = value.strip()
+    candidate = _undefang(value)
     if not candidate:
         raise ValidationError("URL must not be empty")
     if len(candidate) > 4096:
         raise ValidationError("URL exceeds maximum length of 4096 characters")
+
+    # Normalize defanged protocols
+    if re.match(r"^hxxps?://", candidate, re.IGNORECASE):
+        candidate = re.sub(r"^hxxp", "http", candidate, flags=re.IGNORECASE)
+
+    # Prepend scheme if missing (e.g. evil-domain.com/path or google.com)
+    if "://" not in candidate:
+        if candidate.startswith("//"):
+            candidate = "https:" + candidate
+        else:
+            candidate = "https://" + candidate
 
     # Reject null bytes and raw whitespace/control characters
     if any(ord(c) < 32 or ord(c) == 127 for c in candidate):

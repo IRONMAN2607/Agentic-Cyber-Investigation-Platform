@@ -140,3 +140,62 @@ async def test_investigation_crud_and_lifecycle(
     assert resp_events.headers["content-type"].startswith("text/event-stream")
     # Verify stream emitted event data
     assert "data: " in resp_events.text
+
+
+async def test_investigation_creation_all_target_types(
+    client: AsyncClient, auth_headers: dict[Role, dict[str, str]]
+) -> None:
+    """Verify that all target types can be created with canonicalization and defanging."""
+    targets = [
+        ("domain", "evil-attacker.example.com", "evil-attacker.example.com"),
+        ("domain", "https://evil-attacker.example.com/login", "evil-attacker.example.com"),
+        ("domain", "evil[.]malicious[.]org", "evil.malicious.org"),
+        ("url", "https://malicious.example.com/payload.sh", "https://malicious.example.com/payload.sh"),
+        ("url", "evil-attacker.example.com/login", "https://evil-attacker.example.com/login"),
+        ("url", "hxxps://evil[.]org/malware.exe", "https://evil.org/malware.exe"),
+        ("ip", "198.51.100.23", "198.51.100.23"),
+        ("ip", "198.51.100[.]23", "198.51.100.23"),
+        ("ip", "198.51.100.23:8080", "198.51.100.23"),
+        ("hash", "44d88612fea8a8f36de82e1278abb02f", "44d88612fea8a8f36de82e1278abb02f"),
+        ("hash", "MD5: 44D88612FEA8A8F36DE82E1278ABB02F", "44d88612fea8a8f36de82e1278abb02f"),
+        ("log", "access.log", "access.log"),
+        ("pcap", "traffic.pcap", "traffic.pcap"),
+        ("file", "suspicious.exe", "suspicious.exe"),
+        ("description", "Multiple failed ssh logins followed by root elevation", "Multiple failed ssh logins followed by root elevation"),
+    ]
+
+    for target_type, input_val, expected_val in targets:
+        resp = await client.post(
+            "/api/v1/investigations",
+            json={
+                "title": f"Test {target_type}: {input_val}",
+                "target_type": target_type,
+                "target_value": input_val,
+            },
+            headers=auth_headers[Role.INVESTIGATOR],
+        )
+        assert resp.status_code == 201, f"Failed for {target_type} with input '{input_val}': {resp.text}"
+        data = resp.json()
+        assert data["target_type"] == target_type
+        assert data["target_value"] == expected_val
+
+
+async def test_investigation_validation_error_formatting(
+    client: AsyncClient, auth_headers: dict[Role, dict[str, str]]
+) -> None:
+    """Verify that validation errors return a descriptive formatted message."""
+    resp = await client.post(
+        "/api/v1/investigations",
+        json={
+            "title": "Bad Domain Inv",
+            "target_type": "domain",
+            "target_value": "ex ample.com",
+        },
+        headers=auth_headers[Role.INVESTIGATOR],
+    )
+    assert resp.status_code == 422
+    err_body = resp.json()
+    assert err_body["code"] == "validation_error"
+    assert "domain label" in err_body["message"]
+    assert "contains invalid characters" in err_body["message"]
+

@@ -37,12 +37,24 @@
         if (text && text.trim()) {
           try {
             const err = JSON.parse(text);
-            if (err.message) {
+            if (err.detail && Array.isArray(err.detail.errors) && err.detail.errors.length > 0) {
+              errMsg = err.detail.errors
+                .map((d) => {
+                  const loc = Array.isArray(d.loc)
+                    ? d.loc.filter((p) => p !== "body").join(".")
+                    : "";
+                  const msg = d.msg ? d.msg.replace(/^Value error,\s*/, "") : JSON.stringify(d);
+                  return loc ? `${loc}: ${msg}` : msg;
+                })
+                .join("; ");
+            } else if (err.message && err.message !== "request validation failed") {
               errMsg = err.message;
             } else if (typeof err.detail === "string") {
               errMsg = err.detail;
             } else if (Array.isArray(err.detail)) {
               errMsg = err.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+            } else if (err.message) {
+              errMsg = err.message;
             } else if (err.detail) {
               errMsg = typeof err.detail === "object" ? JSON.stringify(err.detail) : String(err.detail);
             }
@@ -1071,19 +1083,43 @@
 
   const targetTypeEl = document.getElementById("inv-target-type");
   const targetValEl = document.getElementById("inv-target-value");
+  const targetTipEl = document.getElementById("inv-target-tip");
+  const artifactKindEl = document.getElementById("inv-artifact-kind");
   const targetPlaceholders = {
-    url: "e.g. https://malicious.example.com/payload.sh",
-    ip: "e.g. 198.51.100.23",
     domain: "e.g. evil-attacker.example.com",
-    hash: "e.g. 44d88612fea8a8f36de82e1278abb02f",
+    url: "e.g. https://malicious.example.com/payload.sh or evil-site.org",
+    ip: "e.g. 198.51.100.23 or 2001:db8::1",
+    hash: "e.g. 44d88612fea8a8f36de82e1278abb02f (MD5/SHA256)",
     log: "e.g. auth.log or access.log",
     pcap: "e.g. capture.pcap",
     file: "e.g. suspicious_sample.bin",
     description: "e.g. Multiple failed logins followed by privilege escalation",
   };
+  const targetTips = {
+    domain: "Tip: For Domains, URLs, IPs, and Hashes, no file upload is required — ACIP automatically inspects, correlates, and enriches them.",
+    url: "Tip: URLs can include https:// or domain/path. ACIP automatically canonicalizes and safely inspects them.",
+    ip: "Tip: IPv4 or IPv6. Ports and CIDRs (e.g. /24) are handled automatically.",
+    hash: "Tip: MD5, SHA-1, SHA-256, or SHA-512 hashes. ACIP queries threat intelligence feeds.",
+    log: "Tip: Upload a .log file or paste snippets below (Method A or Method B).",
+    pcap: "Tip: Upload a .pcap or .pcapng file below for packet flow and DNS query dissection.",
+    file: "Tip: Upload a file below for static analysis, hashing, and indicator extraction.",
+    description: "Tip: Enter a descriptive incident summary or paste incident tickets.",
+  };
+
   if (targetTypeEl && targetValEl) {
     targetTypeEl.addEventListener("change", () => {
-      targetValEl.placeholder = targetPlaceholders[targetTypeEl.value] || "e.g. indicator value";
+      const type = targetTypeEl.value;
+      targetValEl.placeholder = targetPlaceholders[type] || "e.g. indicator value";
+      if (targetTipEl) {
+        targetTipEl.textContent = targetTips[type] || "Tip: Target value will be audited and enriched.";
+      }
+      if (artifactKindEl) {
+        if (type === "pcap") {
+          artifactKindEl.value = "pcap";
+        } else if (type === "log") {
+          artifactKindEl.value = "unknown";
+        }
+      }
     });
   }
 
@@ -1092,7 +1128,10 @@
     const title = document.getElementById("inv-title").value;
     const target_type = document.getElementById("inv-target-type").value;
     const target_value = document.getElementById("inv-target-value").value;
-    const artifactKind = document.getElementById("inv-artifact-kind")?.value || "web_server_log";
+    let artifactKind = document.getElementById("inv-artifact-kind")?.value || "unknown";
+    if (target_type === "pcap" && artifactKind === "unknown") {
+      artifactKind = "pcap";
+    }
     const artifactContent = document.getElementById("inv-artifact-content")?.value?.trim();
     const fileInput = document.getElementById("inv-artifact-file");
     const file = fileInput?.files?.[0];
@@ -1116,11 +1155,15 @@
 
       // If text/log content pasted in creation modal, ingest immediately
       if (artifactContent) {
+        let defaultFname = "submitted_target.txt";
+        if (target_type === "log") defaultFname = "submitted_target.log";
+        else if (target_type === "pcap") defaultFname = "submitted_target.pcap";
+
         await api(`/investigations/${inv.id}/artifacts/text`, {
           method: "POST",
           body: JSON.stringify({
             content: artifactContent,
-            filename: target_type === "log" ? "submitted_target.log" : "submitted_target.txt",
+            filename: defaultFname,
             declared_kind: artifactKind,
           }),
         });

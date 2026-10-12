@@ -160,12 +160,32 @@ def _install_error_handlers(app: FastAPI, settings: Settings) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        errors = _serialisable_errors(exc)
+        messages: list[str] = []
+        for err in errors:
+            raw_loc = err.get("loc")
+            loc_parts = (
+                [str(p) for p in raw_loc if p != "body"]
+                if isinstance(raw_loc, (list, tuple))
+                else []
+            )
+            loc = " -> ".join(loc_parts)
+            msg = str(err.get("msg", ""))
+            if msg.startswith("Value error, "):
+                msg = msg[len("Value error, ") :]
+            if loc:
+                messages.append(f"{loc}: {msg}")
+            elif msg:
+                messages.append(msg)
+        formatted_message = (
+            f"Validation failed: {'; '.join(messages)}" if messages else "request validation failed"
+        )
         return JSONResponse(
             status_code=422,
             content={
                 "code": "validation_error",
-                "message": "request validation failed",
-                "detail": {"errors": _serialisable_errors(exc)},
+                "message": formatted_message,
+                "detail": {"errors": errors},
             },
         )
 

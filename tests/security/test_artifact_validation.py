@@ -23,6 +23,10 @@ from acip.types import ArtifactKind, TargetType
 def test_validate_ip() -> None:
     assert validate_ip("192.0.2.1") == "192.0.2.1"
     assert validate_ip("2001:0db8:0000:0000:0000:0000:0000:0001") == "2001:db8::1"
+    assert validate_ip("198.51.100[.]23") == "198.51.100.23"
+    assert validate_ip("198.51.100.23:8080") == "198.51.100.23"
+    assert validate_ip("http://198.51.100.23:80/path") == "198.51.100.23"
+    assert validate_ip("198.51.100.0/24") == "198.51.100.0"
     with pytest.raises(ValidationError, match="invalid IP address"):
         validate_ip("999.999.999.999")
     with pytest.raises(ValidationError, match="IP address must not be empty"):
@@ -37,6 +41,8 @@ def test_validate_hash() -> None:
     assert validate_hash(md5.upper()) == md5
     assert validate_hash(sha1.upper()) == sha1
     assert validate_hash(sha256.upper()) == sha256
+    assert validate_hash(f"MD5: {md5}") == md5
+    assert validate_hash(f"sha256: {sha256}") == sha256
 
     with pytest.raises(ValidationError, match="invalid cryptographic hash"):
         validate_hash("not_a_hash")
@@ -47,6 +53,9 @@ def test_validate_hash() -> None:
 def test_validate_domain() -> None:
     assert validate_domain("example.com") == "example.com"
     assert validate_domain("SUB.EXAMPLE.ORG.") == "sub.example.org"
+    assert validate_domain("evil[.]attacker[.]com") == "evil.attacker.com"
+    assert validate_domain("https://evil-attacker.example.com/login") == "evil-attacker.example.com"
+    assert validate_domain("evil.com:8080") == "evil.com"
     with pytest.raises(ValidationError, match=r"domain label.*contains invalid characters"):
         validate_domain("ex ample.com")
     with pytest.raises(ValidationError, match="domain name must not be empty"):
@@ -56,20 +65,34 @@ def test_validate_domain() -> None:
 def test_validate_url() -> None:
     assert validate_url("https://example.com/feed") == "https://example.com/feed"
     assert validate_url("http://EXAMPLE.COM:8080/test") == "http://example.com:8080/test"
+    assert validate_url("example.com") == "https://example.com/"
+    assert validate_url("hxxps://evil[.]com/login?id=1") == "https://evil.com/login?id=1"
     with pytest.raises(ValidationError, match="disallowed URL scheme"):
         validate_url("file:///etc/shadow")
 
 
 def test_validate_target_value_routing() -> None:
     assert validate_target_value(TargetType.IP, "1.1.1.1") == "1.1.1.1"
+    assert validate_target_value(TargetType.IP, "1.1.1.1:443") == "1.1.1.1"
+    assert validate_target_value(TargetType.URL, "example.org") == "https://example.org/"
     assert validate_target_value(TargetType.URL, "https://example.org") == "https://example.org/"
+    assert validate_target_value(TargetType.DOMAIN, "https://evil.org/bad") == "evil.org"
+    assert validate_target_value(TargetType.DOMAIN, "evil[.]org") == "evil.org"
     assert (
         validate_target_value(
             TargetType.HASH, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         )
         == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
+    assert (
+        validate_target_value(
+            TargetType.HASH, "SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
+        == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
     assert validate_target_value(TargetType.LOG, "auth.log") == "auth.log"
+    assert validate_target_value(TargetType.PCAP, "traffic.pcap") == "traffic.pcap"
+    assert validate_target_value(TargetType.DESCRIPTION, "Suspicious SSH login") == "Suspicious SSH login"
 
 
 def test_detect_magic_bytes_pcap() -> None:
