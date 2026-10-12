@@ -26,7 +26,7 @@ from acip.bootstrap import bootstrap
 from acip.config import Settings, get_settings
 from acip.core.llm.router import build_default_router
 from acip.core.orchestration.orchestrator import Orchestrator
-from acip.core.orchestration.planner import StaticPlanner
+from acip.core.orchestration.planner import Planner, StaticPlanner
 from acip.core.orchestration.runner import InvestigationRunner
 from acip.db.session import Database
 from acip.errors import ACIPError
@@ -49,7 +49,13 @@ def build_services(settings: Settings, database: Database) -> Services:
     """Compose the object graph. Pure wiring, no I/O."""
     tools = build_tool_registry()
     agents = build_agent_registry()
-    planner = StaticPlanner(agents)
+    planner: Planner
+    if getattr(settings, "enable_adaptive_planning", False):
+        from acip.core.orchestration.adaptive_planner import AdaptivePlanner
+
+        planner = AdaptivePlanner(agents)
+    else:
+        planner = StaticPlanner(agents)
     router = build_default_router(settings)
     orchestrator = Orchestrator(
         database=database,

@@ -206,6 +206,7 @@ class AgentCapability(StrEnum):
     NETWORK_ANALYSIS = "network_analysis"
     THREAT_INTEL = "threat_intel"
     CORRELATION = "correlation"
+    REASONING = "reasoning"
 
 
 class RetentionState(StrEnum):

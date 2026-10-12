@@ -10,10 +10,13 @@ from __future__ import annotations
 
 from acip.agents.base import Agent
 from acip.agents.correlation import CorrelationAgent
+from acip.agents.hypothesis import HypothesisAgent
 from acip.agents.log_analysis import LogAnalysisAgent
 from acip.agents.mitre import MitreMappingAgent
+from acip.agents.reasoning import ReasoningAgent
 from acip.agents.reporting import ReportAgent
 from acip.agents.triage import TriageAgent
+from acip.agents.validation import ValidationAgent
 from acip.errors import NotFoundError
 from acip.types import AgentCapability
 
@@ -69,5 +72,8 @@ def build_default_registry() -> AgentRegistry:
     registry.register(LogAnalysisAgent())
     registry.register(MitreMappingAgent())
     registry.register(CorrelationAgent())
+    registry.register(ReasoningAgent())
+    registry.register(HypothesisAgent())
+    registry.register(ValidationAgent())
     registry.register(ReportAgent())
     return registry

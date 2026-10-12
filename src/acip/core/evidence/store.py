@@ -245,7 +245,7 @@ class EvidenceStore:
         await self._session.flush()
 
         # Link finding citations in relational join table
-        for evidence_id in draft.evidence_ids:
+        for evidence_id in dict.fromkeys(draft.evidence_ids):
             fe = FindingEvidence(
                 finding_id=row.id,
                 evidence_id=evidence_id,
@@ -292,7 +292,7 @@ class EvidenceStore:
         await self._session.flush()
 
         # Record relational links
-        for eid in draft.supporting_evidence_ids:
+        for eid in dict.fromkeys(draft.supporting_evidence_ids):
             self._session.add(
                 HypothesisEvidence(
                     hypothesis_id=row.id,
@@ -300,7 +300,7 @@ class EvidenceStore:
                     role=EvidenceRole.SUPPORTS.value,
                 )
             )
-        for eid in draft.contradicting_evidence_ids:
+        for eid in dict.fromkeys(draft.contradicting_evidence_ids):
             self._session.add(
                 HypothesisEvidence(
                     hypothesis_id=row.id,

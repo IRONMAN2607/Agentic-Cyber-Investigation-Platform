@@ -46,6 +46,8 @@ class RiskAssessment:
     risk_score: int
     confidence: float
     rationale: str
+    model_opinion: str | None = None
+    model_adjusted_score: int | None = None
 
 
 def assess(findings: Sequence[ScorableFinding]) -> RiskAssessment:
@@ -100,4 +102,25 @@ def assess(findings: Sequence[ScorableFinding]) -> RiskAssessment:
             "weights scaled by per-finding confidence. Hypotheses contribute at half weight; "
             "findings recording an evidence gap contribute nothing."
         ),
+    )
+
+
+def assess_with_model_opinion(
+    findings: Sequence[ScorableFinding],
+    *,
+    model_opinion: str | None = None,
+    model_adjusted_score: int | None = None,
+) -> RiskAssessment:
+    """Assess risk deterministically, attaching an attributed model opinion.
+
+    The model opinion never overwrites the deterministic score or severity (spec s5.11).
+    """
+    base = assess(findings)
+    return RiskAssessment(
+        severity=base.severity,
+        risk_score=base.risk_score,
+        confidence=base.confidence,
+        rationale=base.rationale,
+        model_opinion=model_opinion,
+        model_adjusted_score=model_adjusted_score,
     )
