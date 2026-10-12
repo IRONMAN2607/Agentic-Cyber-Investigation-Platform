@@ -144,6 +144,8 @@ class EvidenceKind(StrEnum):
     PRIVILEGE_EVENT = "privilege_event"
     SESSION_EVENT = "session_event"
     IOC = "ioc"
+    WEB_REQUEST = "web_request"
+    WEB_ATTACK = "web_attack"
 
 
 class SandboxTier(StrEnum):

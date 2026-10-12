@@ -93,13 +93,27 @@ async def test_investigation_full_lifecycle_api(
     assert final_prog.json()["percent_complete"] == 100.0
     assert final_prog.json()["status"] in {"completed", "partial"}
 
-    # 8. Fetch report
+    # 8. Fetch report and detail workspace
     report_resp = await client.get(
         f"/api/v1/investigations/{inv_id}/report",
         headers=investigator_auth,
     )
     assert report_resp.status_code == 200
     assert len(report_resp.json()["content"]) > 0
+
+    detail_resp = await client.get(
+        f"/api/v1/investigations/{inv_id}",
+        headers=investigator_auth,
+    )
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    assert "artifacts" in detail
+    assert "findings" in detail
+    assert "agent_runs" in detail
+    assert "tool_runs" in detail
+    assert "llm_calls" in detail
+    assert "counts" in detail
+    assert "llm_calls" in detail["counts"]
 
     # 9. An investigation holding append-only records refuses a plain delete,
     #    and the refusal names what would have been destroyed.

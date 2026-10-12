@@ -86,7 +86,15 @@ class StaticPlanner:
         log_like = [
             artifact
             for artifact in artifacts
-            if artifact.kind in {ArtifactKind.LINUX_AUTH_LOG.value, ArtifactKind.GENERIC_TEXT.value}
+            if artifact.kind
+            in {
+                ArtifactKind.LINUX_AUTH_LOG.value,
+                ArtifactKind.WEB_SERVER_LOG.value,
+                ArtifactKind.SYS_LOG.value,
+                ArtifactKind.GENERIC_LOG.value,
+                ArtifactKind.GENERIC_TEXT.value,
+                ArtifactKind.URL_RESPONSE.value,
+            }
             or artifact.kind == ArtifactKind.UNKNOWN.value
         ]
         if log_like:
@@ -95,15 +103,16 @@ class StaticPlanner:
                     task_id="t2-log-analysis",
                     agent_name="log_analysis",
                     rationale=(
-                        f"{len(log_like)} artifact(s) may contain authentication records, so "
-                        "the log parser and its detection rules are applicable."
+                        f"{len(log_like)} artifact(s) may contain log records "
+                        "(authentication or web access), so the log parsers and detection "
+                        "rules are applicable."
                     ),
                 )
             )
         else:
             notes.append(
                 "Log analysis was not scheduled: no submitted artifact could plausibly "
-                "contain authentication records."
+                "contain authentication or web access records."
             )
 
         tasks.append(

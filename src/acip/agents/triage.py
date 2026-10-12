@@ -37,7 +37,16 @@ logger = get_logger(__name__)
 
 # Target types whose value is itself an indicator worth scanning.
 _SCANNABLE_TARGETS = frozenset(
-    {TargetType.URL, TargetType.IP, TargetType.DOMAIN, TargetType.HASH, TargetType.DESCRIPTION}
+    {
+        TargetType.URL,
+        TargetType.IP,
+        TargetType.DOMAIN,
+        TargetType.HASH,
+        TargetType.DESCRIPTION,
+        TargetType.LOG,
+        TargetType.FILE,
+        TargetType.PCAP,
+    }
 )
 _MAX_CITED = 10
 _MAX_SNIPPET_BYTES = 4096

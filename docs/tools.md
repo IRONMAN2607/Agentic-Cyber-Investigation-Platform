@@ -93,6 +93,7 @@ This satisfies §12 and supplies the tool-latency and tool-selection-accuracy me
 | Tool | Produces | Notes |
 |---|---|---|
 | `auth_log_parser` | `auth_event`, `privilege_event`, `session_event` | Linux auth logs; BSD syslog and ISO-8601 forms |
+| `web_server_log_parser` | `web_request`, `web_attack` | Nginx, Apache, W3C CLF/Combined access logs; SQLi, LFI, RCE, web shells, scanners |
 | `ioc_extractor` | `ioc` | IPs, domains, URLs, hashes, users, hosts, ports, paths, emails |
 
 ### Planned

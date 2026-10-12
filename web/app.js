@@ -186,7 +186,7 @@
           ` : `
             <button class="btn btn-outline" onclick="window.acipSelect('${inv.id}')">↻ Refresh</button>
           `}
-          <button class="btn btn-outline btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.35);" onclick="window.acipDeleteInvestigation('${inv.id}', '${escapeHtml(inv.title)}')" title="Delete & Purge this Investigation">🗑 Delete</button>
+          <button class="btn btn-outline btn-sm btn-delete-inv" style="color: #f87171; border-color: rgba(239, 68, 68, 0.35);" data-id="${inv.id}" data-title="${escapeHtml(inv.title)}" title="Delete & Purge this Investigation">🗑 Delete</button>
         </div>
       </div>
 
@@ -207,7 +207,7 @@
         <button class="nav-tab ${activeTab === 'all' ? 'active' : ''}" onclick="window.acipSetTab('all')">Overview (All)</button>
         <button class="nav-tab ${activeTab === 'findings' ? 'active' : ''}" onclick="window.acipSetTab('findings')">Findings (${data.findings.length})</button>
         <button class="nav-tab ${activeTab === 'evidence' ? 'active' : ''}" onclick="window.acipSetTab('evidence')">Evidence (${data.counts.evidence || evidenceItems.length})</button>
-        <button class="nav-tab ${activeTab === 'trace' ? 'active' : ''}" onclick="window.acipSetTab('trace')">Execution Trace (${data.agent_runs.length + data.tool_runs.length})</button>
+        <button class="nav-tab ${activeTab === 'trace' ? 'active' : ''}" onclick="window.acipSetTab('trace')">Execution Trace (${data.agent_runs.length + data.tool_runs.length + ((data.llm_calls && data.llm_calls.length) || 0)})</button>
         ${data.report ? `<button class="nav-tab ${activeTab === 'report' ? 'active' : ''}" onclick="window.acipSetTab('report')">Incident Report</button>` : ''}
       </div>
 
@@ -337,7 +337,7 @@
               </tr>
             </thead>
             <tbody>
-              ${data.agent_runs.length === 0 && data.tool_runs.length === 0 ? `
+              ${data.agent_runs.length === 0 && data.tool_runs.length === 0 && (!data.llm_calls || data.llm_calls.length === 0) ? `
                 <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No agent or tool executions recorded yet.</td></tr>
               ` : ''}
               ${data.agent_runs.map(ar => `
@@ -356,6 +356,15 @@
                   <td><span class="badge badge-${tr.status}">${tr.status}</span></td>
                   <td>${tr.duration_ms !== null ? tr.duration_ms + 'ms' : '-'}</td>
                   <td>Produced <strong>${tr.evidence_count}</strong> evidence item(s)</td>
+                </tr>
+              `).join('')}
+              ${(data.llm_calls || []).map(lc => `
+                <tr>
+                  <td><strong>ModelRouter</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">(${escapeHtml(lc.model)})</span></td>
+                  <td><span class="badge badge-hypothesis">MODEL (${escapeHtml(lc.task_class)})</span></td>
+                  <td><span class="badge badge-${lc.schema_valid ? 'succeeded' : 'failed'}">${lc.finish_reason}</span></td>
+                  <td>${lc.latency_ms !== null ? lc.latency_ms + 'ms' : '-'}</td>
+                  <td>Provider: <strong>${escapeHtml(lc.provider)}</strong> · Tokens: <code>${lc.tokens_in} in / ${lc.tokens_out} out</code></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -583,13 +592,53 @@
     const title = document.getElementById("inv-title").value;
     const target_type = document.getElementById("inv-target-type").value;
     const target_value = document.getElementById("inv-target-value").value;
+    const artifactKind = document.getElementById("inv-artifact-kind")?.value || "web_server_log";
+    const artifactContent = document.getElementById("inv-artifact-content")?.value?.trim();
+    const fileInput = document.getElementById("inv-artifact-file");
+    const file = fileInput?.files?.[0];
+
     try {
       const inv = await api("/investigations", {
         method: "POST",
         body: JSON.stringify({ title, target_type, target_value }),
       });
+
+      // If file attached in creation modal, upload immediately
+      if (file) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("kind", artifactKind);
+        await api(`/investigations/${inv.id}/artifacts`, {
+          method: "POST",
+          body: fd,
+        });
+      }
+
+      // If text/log content pasted in creation modal, ingest immediately
+      if (artifactContent) {
+        await api(`/investigations/${inv.id}/artifacts/text`, {
+          method: "POST",
+          body: JSON.stringify({
+            content: artifactContent,
+            filename: target_type === "log" ? "submitted_target.log" : "submitted_target.txt",
+            declared_kind: artifactKind,
+          }),
+        });
+      }
+
+      // Automatically queue & start the real investigation pipeline
+      try {
+        await api(`/investigations/${inv.id}/start`, { method: "POST" });
+        showToast("Investigation started: pipeline executing", "info");
+      } catch (startErr) {
+        showToast(`Investigation created, start pending: ${startErr.message}`, "info");
+      }
+
       document.getElementById("modal-new-inv").close();
-      showToast("Investigation created successfully", "success");
+      if (fileInput) fileInput.value = "";
+      const contentEl = document.getElementById("inv-artifact-content");
+      if (contentEl) contentEl.value = "";
+
       await loadInvestigations();
       selectInvestigation(inv.id);
     } catch (err) {
@@ -648,8 +697,21 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
+
+  // Delegated event handling for action buttons
+  document.addEventListener("click", (e) => {
+    const deleteBtn = e.target.closest(".btn-delete-inv");
+    if (deleteBtn) {
+      const invId = deleteBtn.getAttribute("data-id");
+      const title = deleteBtn.getAttribute("data-title") || "";
+      if (invId) {
+        window.acipDeleteInvestigation(invId, title);
+      }
+    }
+  });
 
   // Auto-init on load
   checkCurrentUser();

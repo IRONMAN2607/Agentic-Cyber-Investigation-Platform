@@ -6,6 +6,7 @@ import json
 import uuid
 from typing import Any, TypeVar
 
+import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,7 @@ from acip.core.llm.contracts import (
     MessageRole,
 )
 from acip.core.llm.errors import (
+    BudgetExceededError,
     LLMError,
     NoAvailableProviderError,
     ProviderAuthError,
@@ -118,6 +120,25 @@ class ModelRouter:
 
         Returns ``(parsed_schema_instance, llm_response)``.
         """
+        if session is not None and investigation_id is not None:
+            stmt = sa.select(
+                sa.func.coalesce(
+                    sa.func.sum(ModelExecution.tokens_in + ModelExecution.tokens_out),
+                    0,
+                )
+            ).where(ModelExecution.investigation_id == investigation_id)
+            tokens = await session.scalar(stmt) or 0
+            if tokens >= self.max_investigation_tokens:
+                raise BudgetExceededError(
+                    f"token budget ceiling exceeded for investigation {investigation_id}: "
+                    f"{tokens} >= {self.max_investigation_tokens}",
+                    detail={
+                        "investigation_id": str(investigation_id),
+                        "tokens_used": int(tokens),
+                        "max_investigation_tokens": self.max_investigation_tokens,
+                    },
+                )
+
         rule = self.policy.get_rule(task_class)
         if not rule.candidates:
             raise NoAvailableProviderError(
@@ -390,6 +411,13 @@ def build_default_router(settings: Any) -> ModelRouter:
             api_key=nvidia_key,
             base_url=settings.nvidia_base_url,
             default_timeout=settings.llm_request_timeout_seconds,
+        )
+    else:
+        from acip.core.llm.providers.reasoning import CyberReasoningProvider
+
+        providers["nvidia"] = CyberReasoningProvider(
+            name="nvidia",
+            default_model=settings.model_nemotron,
         )
     return ModelRouter(
         providers=providers,

@@ -30,6 +30,7 @@ from acip.api.schemas import (
     InvestigationProgress,
     InvestigationResponse,
     InvestigationUpdate,
+    ModelExecutionResponse,
     PagedEvidence,
     ProvenanceChainResponse,
     ReportResponse,
@@ -168,6 +169,13 @@ async def get_investigation_detail(
         .order_by(Report.generated_at.desc())
         .limit(1)
     )
+    llm_calls = (
+        await session.scalars(
+            sa.select(ModelExecution)
+            .where(ModelExecution.investigation_id == investigation_id)
+            .order_by(ModelExecution.created_at)
+        )
+    ).all()
     evidence_count = await session.scalar(
         sa.select(sa.func.count())
         .select_from(Evidence)
@@ -187,7 +195,9 @@ async def get_investigation_detail(
             "agent_runs": len(agent_runs),
             "tool_runs": len(tool_runs),
             "evidence": int(evidence_count or 0),
+            "llm_calls": len(llm_calls),
         },
+        llm_calls=[ModelExecutionResponse.model_validate(row) for row in llm_calls],
     )
 
 

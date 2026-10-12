@@ -171,6 +171,47 @@ async def test_router_structured_output_fails_after_retries() -> None:
         await router.complete(TaskClass.CLASSIFICATION, messages, schema=StructuredAnalysis)
 
 
+@pytest.mark.asyncio
+async def test_router_enforces_investigation_token_ceiling() -> None:
+    import uuid
+    from unittest.mock import AsyncMock, MagicMock
+
+    from acip.core.llm.errors import BudgetExceededError
+
+    p1 = ReplayProvider(name="p1", default_response='{"analysis": "ok"}')
+    rule = TaskRoutingRule(
+        task_class=TaskClass.HYPOTHESIS,
+        candidates=[CandidateModel(provider="p1", model="primary-model")],
+    )
+    policy = RoutingPolicy({TaskClass.HYPOTHESIS: rule})
+    router = ModelRouter(providers={"p1": p1}, policy=policy, max_investigation_tokens=5000)
+
+    inv_id = uuid.uuid4()
+    mock_session = AsyncMock()
+    mock_session.add = MagicMock()
+    # Mock cumulative tokens returned by database query
+    mock_session.scalar.return_value = 5000
+
+    messages = [ChatMessage(role=MessageRole.USER, content="Test")]
+    with pytest.raises(BudgetExceededError, match="token budget ceiling exceeded"):
+        await router.complete(
+            TaskClass.HYPOTHESIS,
+            messages,
+            investigation_id=inv_id,
+            session=mock_session,
+        )
+
+    # When under budget, it succeeds
+    mock_session.scalar.return_value = 4999
+    _parsed, resp = await router.complete(
+        TaskClass.HYPOTHESIS,
+        messages,
+        investigation_id=inv_id,
+        session=mock_session,
+    )
+    assert resp.content == '{"analysis": "ok"}'
+
+
 def test_no_agents_import_provider_sdks() -> None:
     """Architectural invariant: agents must never import specific provider SDKs."""
     agents_dir = Path("src/acip/agents")

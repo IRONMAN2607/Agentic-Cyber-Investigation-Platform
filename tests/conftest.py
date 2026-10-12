@@ -47,6 +47,8 @@ def settings(tmp_path: Path) -> Settings:
         bootstrap_admin_username="admin",
         bootstrap_admin_password=SecretStr("admin-password-123"),
         access_token_ttl_minutes=60,
+        enable_llm_triage=False,
+        enable_adaptive_planning=False,
     )
 
 

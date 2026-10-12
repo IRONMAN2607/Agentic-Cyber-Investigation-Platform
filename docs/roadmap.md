@@ -27,22 +27,23 @@ path rather than reimplemented as a comparison artefact.
 | 2 | Evidence store, grounding invariants, tool layer, artifact intake | **verified** |
 | 3 | Agents, planner, orchestrator, runner, reporting | **verified** |
 | **1′** | **Verification retrofit** | **complete** — all 15 exit criteria met and verified (110 tests, clean ruff/mypy, live UI); see §3 |
-| 4 | Tool and knowledge expansion; sandboxing; hardening | **next**; unblocked by Phase 1′ exit |
+| 4 | Tool and knowledge expansion; sandboxing; hardening | **active focus**; intake & SSRF delivered, remaining tool/sandboxing in progress |
 | 5 | Evidence graph, correlation, PostgreSQL | not started (schema scaffolding exists) |
-| 6 | Model abstraction and routing | not started (schema scaffolding exists) |
+| 6 | Model abstraction and routing | **delivered**; provider protocol, routing policy, fallback, telemetry, token ceiling |
 | 7 | Reasoning agents | not started (schema scaffolding exists) |
 | 8 | Frontend and interaction | initial UI in `web/`; full React app deferred |
 | 9 | Evaluation | not started |
 | 10 | Writing | not started |
 
-**"Verified" means a live command result, not a claim inferred from source.** As of 2026-08-28,
-after completing all Phase 1′ verification gates and implementing Phase 4 SSRF and safe artifact intake:
+**"Verified" means a live command result, not a claim inferred from source.** As of 2026-09-23,
+after completing all Phase 1′ verification gates, implementing Phase 4 SSRF and safe artifact intake,
+and delivering Phase 6 model abstraction with provider routing and execution tracing:
 
 ```text
-pytest                    160 passed
+pytest                    185 passed
 ruff check src tests      All checks passed!
-ruff format --check       112 files already formatted
-mypy src                  Success: no issues found in 65 source files
+ruff format --check       120 files already formatted
+mypy src                  Success: no issues found in 68 source files
 ```
 
 The vertical slice executes end to end — `tests/scenarios/test_auth_log_scenario.py` runs create →
@@ -50,6 +51,8 @@ upload → start → agents → evidence → findings → report against the aut
 negative baseline beside it. Every fixture creates its schema by upgrading Alembic to head; the migration
 tests assert both the revision stamp and model/migration parity, including a real populated-database
 upgrade test from `0002` to `0003` proving data and restrictive provenance FKs survive table rebuilds.
+
+Remaining Phase 4 tool expansion and sandboxing tasks (subprocess isolation, container sandboxing, external network tools, ATT&CK mapping) remain the active implementation focus.
 
 **Earlier revisions of this section claimed the opposite** — "zero tests run against them", "the
 development database has never been created" — and that text survived long after it stopped being
@@ -139,6 +142,8 @@ present.
 | 15 | Localhost/single-user boundary in capability output | met | `/capabilities`, `/admin/capabilities`, and CLI output disclose operating boundary; verified in `test_capabilities.py` |
 
 All 15 exit criteria are verified. Phase 1′ is exited and Phase 4 is unblocked.
+
+Subsequent milestones have delivered Phase 4 safe artifact intake & SSRF protection, deterministic Web Server Access Log Parser (`web_server_log_parser`) and attack detection engine, Phase 6 model abstraction (provider protocol, routing policy, fallback chains, telemetry, token budgeting, and local cyber reasoning engine), and end-to-end integration across frontend, orchestrator, triage agent, and evidence store, bringing the test suite to 185 passing tests. Remaining Phase 4 tool and sandboxing tasks (subprocess isolation, container sandboxing, external network tools, ATT&CK mapping) form the active focus.
 
 ## 4. Phases 4–10
 

@@ -385,6 +385,7 @@ class InvestigationDetail(BaseModel):
     tool_runs: list[ToolRunResponse]
     report: ReportResponse | None
     counts: dict[str, int]
+    llm_calls: list[ModelExecutionResponse] = Field(default_factory=list)
 
 
 class PagedEvidence(BaseModel):

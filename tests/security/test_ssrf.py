@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -126,3 +127,50 @@ async def test_safe_http_fetcher_blocks_empty_or_malformed_urls() -> None:
 
     with pytest.raises(SSRFProtectionError, match="disallowed URL scheme"):
         await fetcher.fetch_url("javascript:alert(1)")
+
+
+@pytest.mark.asyncio
+async def test_safe_http_fetcher_uses_pinned_ip_transport() -> None:
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from acip.core.security.ssrf import PinnedIPTransport, SafeHTTPFetcher, _PinnedIPNetworkBackend
+
+    backend = _PinnedIPNetworkBackend("93.184.216.34")
+    assert backend._pinned_ip == "93.184.216.34"
+
+    transport = PinnedIPTransport("93.184.216.34")
+    assert isinstance(transport._pool._network_backend, _PinnedIPNetworkBackend)
+    assert transport._pool._network_backend._pinned_ip == "93.184.216.34"
+
+    fetcher = SafeHTTPFetcher()
+    with (
+        patch("acip.core.security.ssrf.validate_url_ssrf_safe") as mock_validate,
+        patch("httpx.AsyncClient") as mock_client,
+    ):
+        mock_validate.return_value = ("http://safe-domain.example/data", ["93.184.216.34"])
+        mock_ctx = MagicMock()
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.headers = {}
+
+        async def fake_iter() -> Any:
+            yield b"safe content"
+
+        mock_resp.aiter_bytes = fake_iter
+
+        mock_stream = MagicMock()
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_stream.__aexit__ = AsyncMock(return_value=None)
+        mock_ctx.stream.return_value = mock_stream
+
+        result = await fetcher.fetch_url("http://safe-domain.example/data")
+        assert result.content == b"safe content"
+
+        mock_client.assert_called_once()
+        transport_arg = mock_client.call_args[1].get("transport")
+        assert isinstance(transport_arg, PinnedIPTransport)
+        assert isinstance(transport_arg._pool._network_backend, _PinnedIPNetworkBackend)
+        assert transport_arg._pool._network_backend._pinned_ip == "93.184.216.34"

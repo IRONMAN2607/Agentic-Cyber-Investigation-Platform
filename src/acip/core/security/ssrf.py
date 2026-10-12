@@ -16,9 +16,13 @@ import hashlib
 import ipaddress
 import socket
 import urllib.parse
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any
 
+import httpcore
 import httpx
+from httpcore._backends.auto import AutoBackend
 
 from acip.errors import PayloadTooLargeError, SSRFProtectionError, ValidationError
 
@@ -199,6 +203,53 @@ def validate_url_ssrf_safe(url: str, *, resolve_dns: bool = True) -> tuple[str, 
     return reconstructed, resolved_ips
 
 
+class _PinnedIPNetworkBackend(AutoBackend):
+    """Network backend pinning TCP socket connections to a pre-validated IP address."""
+
+    def __init__(self, pinned_ip: str) -> None:
+        super().__init__()
+        self._pinned_ip = pinned_ip
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,  # noqa: ASYNC109
+        local_address: str | None = None,
+        socket_options: Iterable[httpcore.SOCKET_OPTION] | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        # Establish connection directly to the pre-validated IP from resolved_ips,
+        # preventing DNS rebinding / TOCTOU attacks while retaining the original
+        # hostname for TLS SNI and HTTP Host headers.
+        return await super().connect_tcp(
+            self._pinned_ip,
+            port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+
+class PinnedIPTransport(httpx.AsyncHTTPTransport):
+    """Async HTTP transport establishing socket connection directly to a pinned IP."""
+
+    def __init__(self, pinned_ip: str, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._pool = httpcore.AsyncConnectionPool(
+            ssl_context=self._pool._ssl_context,
+            max_connections=self._pool._max_connections,
+            max_keepalive_connections=self._pool._max_keepalive_connections,
+            keepalive_expiry=self._pool._keepalive_expiry,
+            http1=self._pool._http1,
+            http2=self._pool._http2,
+            retries=self._pool._retries,
+            local_address=self._pool._local_address,
+            uds=self._pool._uds,
+            network_backend=_PinnedIPNetworkBackend(pinned_ip),
+            socket_options=self._pool._socket_options,
+        )
+
+
 class SafeHTTPFetcher:
     """Asynchronous HTTP fetcher with anti-SSRF protection and resource bounding."""
 
@@ -222,7 +273,7 @@ class SafeHTTPFetcher:
 
         for redirect_count in range(self.max_redirects + 1):
             # Pre-flight SSRF validation on current URL
-            validated_url, _ = validate_url_ssrf_safe(current_url, resolve_dns=True)
+            validated_url, resolved_ips = validate_url_ssrf_safe(current_url, resolve_dns=True)
 
             timeout = httpx.Timeout(
                 connect=min(5.0, self.timeout_seconds),
@@ -231,8 +282,11 @@ class SafeHTTPFetcher:
                 pool=5.0,
             )
 
+            pinned_ip = resolved_ips[0] if resolved_ips else None
+            transport = PinnedIPTransport(pinned_ip=pinned_ip, verify=True) if pinned_ip else None
+
             async with httpx.AsyncClient(
-                follow_redirects=False, timeout=timeout, verify=True
+                transport=transport, follow_redirects=False, timeout=timeout, verify=True
             ) as client:
                 try:
                     async with client.stream("GET", validated_url, headers=headers_to_send) as resp:

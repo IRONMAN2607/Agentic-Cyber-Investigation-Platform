@@ -52,6 +52,7 @@ from acip.types import (
     ArtifactKind,
     InvestigationStatus,
     RunStatus,
+    TargetType,
     TaskStatus,
 )
 
@@ -372,8 +373,11 @@ class OrchestratorAgent:
             if artifact.kind
             in {
                 ArtifactKind.LINUX_AUTH_LOG.value,
-                ArtifactKind.GENERIC_TEXT.value,
+                ArtifactKind.WEB_SERVER_LOG.value,
                 ArtifactKind.SYS_LOG.value,
+                ArtifactKind.GENERIC_LOG.value,
+                ArtifactKind.GENERIC_TEXT.value,
+                ArtifactKind.URL_RESPONSE.value,
             }
             or artifact.kind == ArtifactKind.UNKNOWN.value
         ]
@@ -383,8 +387,9 @@ class OrchestratorAgent:
                     task_id="t2-log-analysis",
                     agent_name="log_analysis",
                     rationale=(
-                        f"{len(log_like)} artifact(s) may contain authentication records, so "
-                        "the log parser and its detection rules are applicable."
+                        f"{len(log_like)} artifact(s) may contain log records "
+                        "(authentication or web access), so the log parsers and detection "
+                        "rules are applicable."
                     ),
                 )
             )
@@ -411,6 +416,87 @@ class OrchestratorAgent:
         async with self._db.session() as session:
             investigation = await _load_investigation(session, investigation_id)
             artifacts = await _load_artifacts(session, investigation_id)
+
+            if not artifacts:
+                if investigation.target_type_enum == TargetType.URL and investigation.target_value:
+                    try:
+                        from acip.core.security.files import store_bytes
+                        from acip.core.security.ssrf import SafeHTTPFetcher
+
+                        fetcher = SafeHTTPFetcher(
+                            max_bytes=self._settings.max_artifact_bytes,
+                            max_redirects=3,
+                            timeout_seconds=5.0,
+                        )
+                        fetch_res = await fetcher.fetch_url(investigation.target_value)
+                        stored = await store_bytes(
+                            fetch_res.content,
+                            dest_dir=self._settings.artifact_dir,
+                            max_bytes=self._settings.max_artifact_bytes,
+                            original_filename=f"url_target_{fetch_res.sha256[:8]}.bin",
+                            declared_kind=ArtifactKind.UNKNOWN,
+                        )
+                        auto_art = Artifact(
+                            investigation_id=investigation.id,
+                            kind=stored.detected_kind.value,
+                            original_filename=stored.safe_filename,
+                            sha256=stored.sha256,
+                            size_bytes=stored.size_bytes,
+                            storage_path=str(stored.path),
+                            uploaded_by=investigation.created_by,
+                        )
+                        session.add(auto_art)
+                        await session.flush()
+                        artifacts = await _load_artifacts(session, investigation_id)
+                    except Exception as exc:
+                        logger.warning(
+                            "automatic URL artifact intake could not complete: %s",
+                            exc,
+                            extra={"url": investigation.target_value},
+                        )
+                elif investigation.target_type_enum in {
+                    TargetType.LOG,
+                    TargetType.FILE,
+                    TargetType.DESCRIPTION,
+                }:
+                    raw_val = investigation.target_value.strip()
+                    if ("\n" in raw_val or " " in raw_val) and len(raw_val) >= 20:
+                        try:
+                            from acip.core.security.files import store_bytes
+
+                            decl_kind = (
+                                ArtifactKind.LINUX_AUTH_LOG
+                                if investigation.target_type_enum == TargetType.LOG
+                                else ArtifactKind.GENERIC_TEXT
+                            )
+                            fname = (
+                                "target_content.log"
+                                if decl_kind == ArtifactKind.LINUX_AUTH_LOG
+                                else "target_content.txt"
+                            )
+                            stored = await store_bytes(
+                                raw_val.encode("utf-8"),
+                                dest_dir=self._settings.artifact_dir,
+                                max_bytes=self._settings.max_artifact_bytes,
+                                original_filename=fname,
+                                declared_kind=decl_kind,
+                            )
+                            auto_art = Artifact(
+                                investigation_id=investigation.id,
+                                kind=decl_kind.value,
+                                original_filename=stored.safe_filename,
+                                sha256=stored.sha256,
+                                size_bytes=stored.size_bytes,
+                                storage_path=str(stored.path),
+                                uploaded_by=investigation.created_by,
+                            )
+                            session.add(auto_art)
+                            await session.flush()
+                            artifacts = await _load_artifacts(session, investigation_id)
+                        except Exception as exc:
+                            logger.warning(
+                                "automatic text artifact intake could not complete: %s", exc
+                            )
 
             # If a planner is provided, respect its plan
             if self._planner is not None:

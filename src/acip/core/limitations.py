@@ -30,7 +30,8 @@ def get_not_implemented(settings: Any = None) -> list[str]:
             "deterministically from stored records."
         )
     items.append(
-        "Log parsing covers Linux authentication logs only (BSD syslog and ISO-8601 forms)."
+        "Log parsing covers Linux authentication logs (sshd/sudo/PAM) and "
+        "Web server access logs (Nginx/Apache/W3C/Combined/CLF)."
     )
     return items
 

@@ -78,9 +78,13 @@
       <div class="form-group">
         <label for="inv-target-type">Target Type</label>
         <select id="inv-target-type" class="form-control">
-          <option value="log">Log File</option>
+          <option value="url">URL</option>
           <option value="ip">IP Address</option>
-          <option value="host">Host</option>
+          <option value="domain">Domain Name</option>
+          <option value="hash">File Hash</option>
+          <option value="file">File</option>
+          <option value="log">Log File</option>
+          <option value="pcap">PCAP Capture</option>
           <option value="description">Incident Description</option>
         </select>
       </div>
@@ -88,9 +92,30 @@
         <label for="inv-target-value">Target Value / Identifier</label>
         <input type="text" id="inv-target-value" class="form-control" placeholder="e.g. auth.log or 203.0.113.55" required>
       </div>
+      <div class="form-group">
+        <label for="inv-artifact-kind">Artifact Kind (if uploading or pasting logs)</label>
+        <select id="inv-artifact-kind" class="form-control">
+          <option value="web_server_log">Web Server Log (Nginx/Apache/W3C)</option>
+          <option value="linux_auth_log">Linux Auth Log (sshd/sudo)</option>
+          <option value="syslog">Syslog</option>
+          <option value="generic_log">Generic Log</option>
+          <option value="pcap">PCAP</option>
+          <option value="pcapng">PCAPNG</option>
+          <option value="generic_text">Generic Text</option>
+          <option value="unknown">Auto / Unknown</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="inv-artifact-content">Provide Evidence via Method A: Paste Log / Text Content</label>
+        <textarea id="inv-artifact-content" class="form-control" rows="3" placeholder="Paste access.log or auth.log snippet here (no file needed)..."></textarea>
+      </div>
+      <div class="form-group">
+        <label for="inv-artifact-file">— OR Method B: Upload Artifact File</label>
+        <input type="file" id="inv-artifact-file" class="form-control">
+      </div>
       <div class="dialog-actions">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-new-inv').close()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Investigation</button>
+        <button type="submit" class="btn btn-primary">Create & Run Investigation</button>
       </div>
     </form>
   </dialog>
@@ -111,7 +136,12 @@
         <label for="upload-kind">Declared Kind</label>
         <select id="upload-kind" class="form-control">
           <option value="linux_auth_log">Linux Auth Log (syslog/sshd)</option>
-          <option value="json">JSON Records</option>
+          <option value="syslog">Syslog</option>
+          <option value="web_server_log">Web Server Log</option>
+          <option value="generic_log">Generic Log</option>
+          <option value="pcap">PCAP</option>
+          <option value="pcapng">PCAPNG</option>
+          <option value="generic_text">Generic Text</option>
           <option value="unknown">Generic / Unknown</option>
         </select>
       </div>
