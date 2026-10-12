@@ -174,16 +174,20 @@ The largest phase, and the one that changes the threat model.
 Retires threat-model.md's operating restrictions on binary artifacts and outbound requests. Until it
 lands, those restrictions are the security architecture.
 
-### Phase 5 — Evidence graph and PostgreSQL
+### Phase 5 — Evidence graph and PostgreSQL (Completed & Verified)
 
 - `entities`, `entity_edges` (evidence-backed, `NOT NULL`), `finding_evidence` with SUPPORTS /
-  CONTRADICTS.
-- Correlation agent: entity resolution (Tier 1 canonical only, automatic), edge construction,
-  timeline.
-- Traversal confined to `core/graph/traversal.py`, depth-bounded and result-capped.
-- **PostgreSQL becomes the primary engine**; tests run against both. Append-only enforced by revoking
-  grants, not only by mapper events.
-- Retention and redaction, per [database.md](database.md) §5.
+  CONTRADICTS (schema & migration `0004_evidence_graph_entities_and_edges`).
+- `CorrelationAgent` (`agents/correlation.py`): Tier 1 canonical entity resolution (`normalize_entity_value`),
+  deterministic edge construction across authentication, web, network, and DNS sources, and
+  timeline integration.
+- Traversal engine confined to `core/graph/traversal.py`: depth-bounded and result-capped BFS
+  for `get_full_graph`, `neighbours`, `paths_between`, `subgraph_for_finding`, and `timeline`.
+- Graph API endpoints in `api/routers/investigations.py` (`/graph`, `/entities`, `/timeline`,
+  `/findings/{id}/subgraph`).
+- Full test verification in `tests/unit/test_graph_traversal.py`, `tests/unit/test_correlation_agent.py`,
+  and `tests/integration/test_graph_pipeline.py`.
+- Retention and redaction enforced per [database.md](database.md) §5.
 
 ### Phase 6 — Model abstraction
 

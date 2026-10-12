@@ -326,9 +326,9 @@ async def test_orchestrator_agent_respects_static_planner_verbatim(
     outcome = await orchestrator.execute(inv_id)
 
     assert outcome.status == InvestigationStatus.COMPLETED
-    # StaticPlanner plans triage, log_analysis, mitre, reporting
+    # StaticPlanner plans triage, log_analysis, mitre, correlation, reporting
     executed_agents = [o.task.agent_name for o in outcome.outcomes]
-    assert executed_agents == ["triage", "log_analysis", "mitre", "reporting"]
+    assert executed_agents == ["triage", "log_analysis", "mitre", "correlation", "reporting"]
 
     state = orchestrator.get_state(inv_id)
     assert state is not None
@@ -336,5 +336,6 @@ async def test_orchestrator_agent_respects_static_planner_verbatim(
         "triage",
         "log_analysis",
         "mitre",
+        "correlation",
         "reporting",
     ]

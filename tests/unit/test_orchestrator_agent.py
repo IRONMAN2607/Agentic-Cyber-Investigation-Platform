@@ -193,8 +193,9 @@ def test_interpret_triage_result_fallback_when_unsuccessful(tmp_path: Path) -> N
     tasks, notes, analysis = orchestrator.interpret_triage_result(failed_result, [art])
 
     assert analysis is None
-    assert len(tasks) == 3  # Fallback: log_analysis + mitre + reporting
+    assert len(tasks) == 4  # Fallback: log_analysis + mitre + correlation + reporting
     assert tasks[0].agent_name == "log_analysis"
     assert tasks[1].agent_name == "mitre"
-    assert tasks[2].agent_name == "reporting"
+    assert tasks[2].agent_name == "correlation"
+    assert tasks[3].agent_name == "reporting"
     assert any("fallback" in note.lower() for note in notes)

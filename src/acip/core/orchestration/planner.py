@@ -120,6 +120,17 @@ class StaticPlanner:
                         ),
                     )
                 )
+            if self._registry.has("correlation"):
+                tasks.append(
+                    Task(
+                        task_id="t4-correlation",
+                        agent_name="correlation",
+                        rationale=(
+                            "Builds the canonical evidence graph, resolves entities "
+                            "deterministically, and derives evidence-backed relational edges."
+                        ),
+                    )
+                )
         else:
             notes.append(
                 "Log analysis was not scheduled: no submitted artifact could plausibly "

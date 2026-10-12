@@ -404,6 +404,17 @@ class OrchestratorAgent:
                         ),
                     )
                 )
+            if self._agents.has("correlation"):
+                tasks.append(
+                    Task(
+                        task_id="t4-correlation",
+                        agent_name="correlation",
+                        rationale=(
+                            "Builds the canonical evidence graph, resolves entities "
+                            "deterministically, and derives evidence-backed relational edges."
+                        ),
+                    )
+                )
 
         if self._agents.has("reporting"):
             tasks.append(

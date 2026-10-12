@@ -307,6 +307,57 @@ class Finding(Base):
         return Severity(self.severity)
 
 
+class Entity(Base):
+    """Phase 5 evidence graph node: canonical resolved entity."""
+
+    __tablename__ = "entities"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "investigation_id", "type", "value_normalized", name="uq_investigation_entity"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    type: Mapped[str] = mapped_column(sa.String(32), index=True)
+    value_normalized: Mapped[str] = mapped_column(sa.String(256), index=True)
+    value_raw_first_seen: Mapped[str] = mapped_column(sa.String(256))
+    first_seen_at: Mapped[dt.datetime | None] = mapped_column(default=None)
+    last_seen_at: Mapped[dt.datetime | None] = mapped_column(default=None)
+    observation_count: Mapped[int] = mapped_column(sa.Integer, default=1)
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
+
+
+class EntityEdge(Base):
+    """Phase 5 evidence graph edge: verified, evidence-backed relationship."""
+
+    __tablename__ = "entity_edges"
+    __table_args__ = (
+        sa.Index("ix_entity_edges_src", "investigation_id", "src_entity_id"),
+        sa.Index("ix_entity_edges_dst", "investigation_id", "dst_entity_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    src_entity_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("entities.id", ondelete="CASCADE"), index=True
+    )
+    dst_entity_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("entities.id", ondelete="CASCADE"), index=True
+    )
+    relation: Mapped[str] = mapped_column(sa.String(64), index=True)
+    evidence_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("evidence.id", ondelete="CASCADE"), index=True
+    )
+    observed_at: Mapped[dt.datetime | None] = mapped_column(default=None)
+    confidence: Mapped[float] = mapped_column(sa.Float, default=1.0)
+    created_at: Mapped[dt.datetime] = mapped_column(default=utcnow)
+
+
 class FindingEvidence(Base):
     """Phase 5 schema scaffolding: relational citation mapping evidence to findings.
 

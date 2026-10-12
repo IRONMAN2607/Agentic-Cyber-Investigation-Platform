@@ -33,6 +33,9 @@ def get_not_implemented(settings: Any = None) -> list[str]:
     items.append(
         "Deterministic MITRE ATT&CK mapping is active for authentication and web attack rules."
     )
+    items.append(
+        "Deterministic evidence graph correlation and canonical entity resolution are active."
+    )
     return items
 
 

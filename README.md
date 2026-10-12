@@ -68,12 +68,13 @@ without starting a server.
 ```text
 src/acip/
 ├── api/            FastAPI app, routers, request/response schemas
-├── agents/         Agents: triage, log_analysis, reporting
+├── agents/         Agents: triage, log_analysis, mitre, correlation, reporting
 ├── tools/          Tool adapters — the only producers of evidence
 ├── core/
 │   ├── evidence/   Evidence contracts + append-only store (grounding invariants)
+│   ├── graph/      Evidence graph traversal engine (depth-bounded, cycle-safe)
 │   ├── orchestration/  Planner, orchestrator, background runner
-│   ├── detection/  Pure deterministic detection rules
+│   ├── detection/  Pure deterministic detection rules & MITRE catalog
 │   ├── security/   Passwords, tokens, authz, safe artifact intake
 │   ├── risk.py     Deterministic severity/risk scoring
 │   └── limitations.py  Declared capability gaps

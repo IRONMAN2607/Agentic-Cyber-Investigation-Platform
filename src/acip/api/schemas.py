@@ -465,5 +465,59 @@ class ErrorResponse(BaseModel):
     detail: dict[str, Any] = Field(default_factory=dict)
 
 
+# --- Evidence Graph & Timeline ------------------------------------------------
+
+
+class EntityResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    type: str
+    value_normalized: str
+    value_raw_first_seen: str
+    first_seen_at: dt.datetime | None = None
+    last_seen_at: dt.datetime | None = None
+    observation_count: int = 1
+    created_at: dt.datetime
+
+
+class EntityEdgeResponse(BaseModel):
+    model_config = _ORM
+
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    src_entity_id: uuid.UUID
+    dst_entity_id: uuid.UUID
+    relation: str
+    evidence_id: uuid.UUID
+    observed_at: dt.datetime | None = None
+    confidence: float = 1.0
+    created_at: dt.datetime
+
+
+class GraphResponse(BaseModel):
+    investigation_id: uuid.UUID
+    entities: list[EntityResponse]
+    edges: list[EntityEdgeResponse]
+    truncated: bool = False
+
+
+class TimelineEventResponse(BaseModel):
+    evidence_id: uuid.UUID
+    observed_at: dt.datetime | None = None
+    source_tool: str
+    kind: str
+    time_confidence: str
+    summary: str
+    entities: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class TimelineResponse(BaseModel):
+    investigation_id: uuid.UUID
+    events: list[TimelineEventResponse]
+    total: int
+
+
 # Resolve the forward reference in TokenResponse.
 TokenResponse.model_rebuild()

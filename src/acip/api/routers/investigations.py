@@ -23,8 +23,11 @@ from acip.api.deps import (
 from acip.api.schemas import (
     AgentRunResponse,
     ArtifactResponse,
+    EntityEdgeResponse,
+    EntityResponse,
     EvidenceResponse,
     FindingResponse,
+    GraphResponse,
     InvestigationCreate,
     InvestigationDetail,
     InvestigationProgress,
@@ -38,17 +41,21 @@ from acip.api.schemas import (
     TaskCreate,
     TaskRunResponse,
     TextArtifactIngest,
+    TimelineEventResponse,
+    TimelineResponse,
     ToolRunResponse,
     URLArtifactIngest,
 )
 from acip.core import audit
 from acip.core.evidence.store import MAX_EVIDENCE_PAGE, EvidenceStore
+from acip.core.graph.traversal import GraphTraversal
 from acip.core.security.files import store_bytes, store_stream
 from acip.core.security.ratelimit import investigation_limiter, rate_limit
 from acip.core.security.ssrf import SafeHTTPFetcher
 from acip.db.models import (
     AgentRun,
     Artifact,
+    Entity,
     Evidence,
     Finding,
     Investigation,
@@ -850,6 +857,126 @@ async def delete_investigation(
     logger.info(
         "investigation purged" if destroyed else "investigation deleted",
         extra={"investigation_id": inv_id_str, "actor": user.username, "destroyed": destroyed},
+    )
+
+
+# --- Evidence Graph & Timeline Endpoints ------------------------------------
+
+
+@router.get("/{investigation_id}/graph", response_model=GraphResponse)
+async def get_investigation_graph(
+    investigation: LoadedInvestigation,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    entity: Annotated[
+        uuid.UUID | None,
+        Query(description="Optional entity node ID to root bounded traversal"),
+    ] = None,
+    depth: Annotated[int, Query(ge=1, le=6, description="Traversal hop limit (default 2)")] = 2,
+    limit: Annotated[int, Query(ge=1, le=1000, description="Max edge/entity result cap")] = 250,
+) -> GraphResponse:
+    """Fetch the evidence graph for this investigation.
+
+    If entity is provided, returns depth-bounded neighborhood traversal around that entity.
+    Otherwise returns the bounded investigation evidence graph.
+    """
+    traversal = GraphTraversal(session, investigation.id)
+    if entity is not None:
+        subgraph = await traversal.neighbours(entity, max_depth=depth, limit=limit)
+    else:
+        subgraph = await traversal.get_full_graph(limit=limit)
+
+    return GraphResponse(
+        investigation_id=subgraph.investigation_id,
+        entities=[EntityResponse.model_validate(e) for e in subgraph.entities],
+        edges=[EntityEdgeResponse.model_validate(e) for e in subgraph.edges],
+        truncated=subgraph.truncated,
+    )
+
+
+@router.get("/{investigation_id}/entities", response_model=list[EntityResponse])
+async def list_investigation_entities(
+    investigation: LoadedInvestigation,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    type: Annotated[str | None, Query(description="Filter by EntityType")] = None,
+    q: Annotated[
+        str | None, Query(description="Substring search over normalized or raw value")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+) -> list[EntityResponse]:
+    """List canonical resolved entities in this investigation."""
+    stmt = sa.select(Entity).where(Entity.investigation_id == investigation.id)
+    if type:
+        stmt = stmt.where(Entity.type == type)
+    if q:
+        query_pat = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            sa.or_(
+                Entity.value_normalized.ilike(query_pat),
+                Entity.value_raw_first_seen.ilike(query_pat),
+            )
+        )
+    stmt = stmt.order_by(Entity.observation_count.desc(), Entity.created_at.asc()).limit(limit)
+    rows = (await session.scalars(stmt)).all()
+    return [EntityResponse.model_validate(r) for r in rows]
+
+
+@router.get("/{investigation_id}/timeline", response_model=TimelineResponse)
+async def get_investigation_timeline(
+    investigation: LoadedInvestigation,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+) -> TimelineResponse:
+    """Chronologically ordered event timeline over stored evidence."""
+    traversal = GraphTraversal(session, investigation.id)
+    events = await traversal.timeline(limit=limit)
+    return TimelineResponse(
+        investigation_id=investigation.id,
+        events=[
+            TimelineEventResponse(
+                evidence_id=ev.evidence_id,
+                observed_at=ev.observed_at,
+                source_tool=ev.source_tool,
+                kind=ev.kind,
+                time_confidence=ev.time_confidence,
+                summary=ev.summary,
+                entities=ev.entities,
+            )
+            for ev in events
+        ],
+        total=len(events),
+    )
+
+
+@router.get(
+    "/{investigation_id}/findings/{finding_id}/subgraph",
+    response_model=GraphResponse,
+)
+async def get_finding_subgraph(
+    investigation: LoadedInvestigation,
+    finding_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=1000)] = 250,
+) -> GraphResponse:
+    """Extract the evidence subgraph supporting a specific finding."""
+    finding = await session.scalar(
+        sa.select(Finding).where(
+            Finding.id == finding_id,
+            Finding.investigation_id == investigation.id,
+        )
+    )
+    if finding is None:
+        raise NotFoundError(
+            f"finding {finding_id} not found in this investigation",
+            detail={"investigation_id": str(investigation.id)},
+        )
+
+    traversal = GraphTraversal(session, investigation.id)
+    subgraph = await traversal.subgraph_for_finding(finding_id, limit=limit)
+    return GraphResponse(
+        investigation_id=subgraph.investigation_id,
+        entities=[EntityResponse.model_validate(e) for e in subgraph.entities],
+        edges=[EntityEdgeResponse.model_validate(e) for e in subgraph.edges],
+        truncated=subgraph.truncated,
     )
 
 

@@ -182,6 +182,11 @@ class EntityType(StrEnum):
     PROCESS = "process"
     PORT = "port"
     EMAIL = "email"
+    TECHNIQUE = "technique"
+    MALWARE = "malware"
+    THREAT_ACTOR = "threat_actor"
+    ALERT = "alert"
+    REGISTRY_KEY = "registry_key"
 
 
 class AgentCapability(StrEnum):
@@ -200,6 +205,7 @@ class AgentCapability(StrEnum):
     MITRE_MAPPING = "mitre_mapping"
     NETWORK_ANALYSIS = "network_analysis"
     THREAT_INTEL = "threat_intel"
+    CORRELATION = "correlation"
 
 
 class RetentionState(StrEnum):

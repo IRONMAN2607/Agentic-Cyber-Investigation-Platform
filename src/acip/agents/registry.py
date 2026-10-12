@@ -9,6 +9,7 @@ import failure at startup.
 from __future__ import annotations
 
 from acip.agents.base import Agent
+from acip.agents.correlation import CorrelationAgent
 from acip.agents.log_analysis import LogAnalysisAgent
 from acip.agents.mitre import MitreMappingAgent
 from acip.agents.reporting import ReportAgent
@@ -67,5 +68,6 @@ def build_default_registry() -> AgentRegistry:
     registry.register(TriageAgent())
     registry.register(LogAnalysisAgent())
     registry.register(MitreMappingAgent())
+    registry.register(CorrelationAgent())
     registry.register(ReportAgent())
     return registry
