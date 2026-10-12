@@ -26,24 +26,22 @@ path rather than reimplemented as a comparison artefact.
 | 1 | Foundation: config, types, errors, logging, DB, auth, API skeleton | **verified** |
 | 2 | Evidence store, grounding invariants, tool layer, artifact intake | **verified** |
 | 3 | Agents, planner, orchestrator, runner, reporting | **verified** |
-| **1′** | **Verification retrofit** | **complete** — all 15 exit criteria met and verified (110 tests, clean ruff/mypy, live UI); see §3 |
-| 4 | Tool and knowledge expansion; sandboxing; hardening | **active focus**; intake & SSRF delivered, remaining tool/sandboxing in progress |
-| 5 | Evidence graph, correlation, PostgreSQL | not started (schema scaffolding exists) |
+| **1′** | **Verification retrofit** | **complete** — all 15 exit criteria met and verified; see §3 |
+| 4 | Tool and knowledge expansion; sandboxing; hardening | **verified**; T1 sandbox, Web log parser, PCAP parser, Threat Intel, MITRE agent (G7) |
+| 5 | Evidence graph, correlation, PostgreSQL | **active focus** |
 | 6 | Model abstraction and routing | **delivered**; provider protocol, routing policy, fallback, telemetry, token ceiling |
 | 7 | Reasoning agents | not started (schema scaffolding exists) |
 | 8 | Frontend and interaction | initial UI in `web/`; full React app deferred |
 | 9 | Evaluation | not started |
 | 10 | Writing | not started |
 
-**"Verified" means a live command result, not a claim inferred from source.** As of 2026-09-23,
-after completing all Phase 1′ verification gates, implementing Phase 4 SSRF and safe artifact intake,
-and delivering Phase 6 model abstraction with provider routing and execution tracing:
+**"Verified" means a live command result, not a claim inferred from source.** Verified figures:
 
 ```text
-pytest                    185 passed
+pytest                    198 passed
 ruff check src tests      All checks passed!
-ruff format --check       120 files already formatted
-mypy src                  Success: no issues found in 68 source files
+ruff format --check       130 files already formatted
+mypy src tests            Success: no issues found in 130 source files
 ```
 
 The vertical slice executes end to end — `tests/scenarios/test_auth_log_scenario.py` runs create →

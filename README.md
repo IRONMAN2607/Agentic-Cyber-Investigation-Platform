@@ -20,20 +20,20 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 
 ## Status
 
-**Phases 0–3 verified. Phase 1′ (verification retrofit) is complete — all 15 exit criteria are met and verified. Phase 4 is unblocked.** [docs/roadmap.md](docs/roadmap.md) is the authority on phase numbering and §3.1 marks every criterion individually.
+**Phases 0–4 verified. Phase 4 (tool/knowledge expansion, T1 sandboxing, MITRE ATT&CK G7 mapping, PCAP parsing, threat intel) is complete. Phase 5 is unblocked.** [docs/roadmap.md](docs/roadmap.md) is the authority on phase numbering.
 
 | Quality Gate | Status |
 |---|---|
-| Tests | **185 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
+| Tests | **198 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
 | Lint | **0 ruff errors** (`ruff check src tests`) |
-| Formatting | **100% formatted** across 120 files (`ruff format --check src tests`) |
-| Types | **0 mypy errors** across 68 source files (`mypy src`) |
-| Vertical slice | **100% verified end to end** with SQLite database, real auth log attacks, and clean log baselines |
+| Formatting | **100% formatted** across 130 files (`ruff format --check src tests`) |
+| Types | **0 mypy errors** across 130 source files (`mypy src tests`) |
+| Vertical slice | **100% verified end to end** with SQLite database, real auth and web attacks, clean baselines, and MITRE mapping |
 | Orchestrator Agent | `OrchestratorAgent` coordinates lifecycle, executes triage, interprets structured `TriageAnalysis`, creates tasks, and maintains `InvestigationState` |
-| Security Invariants | Grounding invariants G0–G4, append-only immutability (incl. bulk DML), provenance integrity, token safety, role authz matrix, request rate limits, anti-SSRF protection, magic-byte PCAP/binary intake validation, no `shell=True` |
+| Security Invariants | Grounding invariants G0–G4, Invariant G7 (MITRE ATT&CK catalog bounds), append-only immutability (incl. bulk DML), provenance integrity, token safety, role authz matrix, request rate limits, anti-SSRF protection, magic-byte intake validation, T1 sandbox isolation (no `shell=True`) |
 | Model Abstraction & Routing | `ModelRouter`, `RoutingPolicy`, OpenAI-compatible `NvidiaNIMProvider` (Nemotron, DeepSeek R1), local `CyberReasoningProvider` dynamic evaluation engine, Pydantic structured output repair, deterministic `ReplayProvider` test double |
-| Active Phase 4 Capabilities | Deterministic Web Server Access Log Parser (`web_server_log_parser`) with SQLi/LFI/RCE/WebShell detection, URL, IP, Hash, PCAP, Log, and File artifact intake with anti-SSRF protection and content sniffing |
-| Deferred Phase 4 Capabilities | T1 subprocess tools, T2 container isolation, and MITRE ATT&CK mapping agent |
+| Active Phase 4 Capabilities | Deterministic Web Server Access Log Parser (`web_server_log_parser`), Linux Auth Log Parser (`auth_log_parser`), PCAP Packet Capture Parser (`pcap_parser`), Threat Intelligence adapter (`threat_intel`), IOC Extractor (`ioc_extractor`), MITRE ATT&CK Mapping Agent (`mitre`), Tier 1 Subprocess Sandbox |
+| Active Focus (Phase 5) | Evidence graph (`entities`, `entity_edges`, `finding_evidence`), `CorrelationAgent`, depth-bounded graph traversal |
 | Frontend | **Interactive dashboard** in `web/` served directly by FastAPI |
 
 `GET /capabilities` and `acip capabilities` report what this deployment can actually do, and
