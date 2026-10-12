@@ -393,6 +393,17 @@ class OrchestratorAgent:
                     ),
                 )
             )
+            if self._agents.has("mitre"):
+                tasks.append(
+                    Task(
+                        task_id="t3-mitre",
+                        agent_name="mitre",
+                        rationale=(
+                            "Maps observed detection rule findings deterministically to "
+                            "verified MITRE ATT&CK Enterprise tactics and techniques."
+                        ),
+                    )
+                )
 
         if self._agents.has("reporting"):
             tasks.append(

@@ -11,6 +11,8 @@ from acip.errors import ToolUnavailableError
 from acip.tools.auth_log_parser import LinuxAuthLogParser
 from acip.tools.base import ToolAdapter, ToolAvailability
 from acip.tools.ioc_extractor import IOCExtractor
+from acip.tools.pcap_parser import PcapParser
+from acip.tools.threat_intel import ThreatIntelTool
 from acip.tools.web_log_parser import WebServerLogParser
 
 
@@ -48,10 +50,12 @@ def build_default_registry() -> ToolRegistry:
     """The tools available in the platform.
 
     Provides deterministic adapters for authentication logs, web server access logs,
-    and indicator extraction.
+    PCAP network captures, threat intelligence lookups, and indicator extraction.
     """
     registry = ToolRegistry()
     registry.register(LinuxAuthLogParser())
     registry.register(WebServerLogParser())
+    registry.register(PcapParser())
+    registry.register(ThreatIntelTool())
     registry.register(IOCExtractor())
     return registry

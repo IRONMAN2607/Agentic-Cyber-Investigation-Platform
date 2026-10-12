@@ -25,9 +25,9 @@ def test_static_planner_with_auth_log() -> None:
     )
 
     plan = planner.plan(inv, [art])
-    assert len(plan) == 3
+    assert len(plan) == 4
     task_agents = [t.agent_name for t in plan.tasks]
-    assert task_agents == ["triage", "log_analysis", "reporting"]
+    assert task_agents == ["triage", "log_analysis", "mitre", "reporting"]
     for t in plan.tasks:
         assert t.rationale.strip() != ""
 

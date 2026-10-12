@@ -146,6 +146,10 @@ class EvidenceKind(StrEnum):
     IOC = "ioc"
     WEB_REQUEST = "web_request"
     WEB_ATTACK = "web_attack"
+    NETWORK_FLOW = "network_flow"
+    DNS_QUERY = "dns_query"
+    THREAT_INTEL = "threat_intel"
+    MITRE_TECHNIQUE = "mitre_technique"
 
 
 class SandboxTier(StrEnum):
@@ -193,6 +197,9 @@ class AgentCapability(StrEnum):
     HYPOTHESIS = "hypothesis"
     VALIDATION = "validation"
     ORCHESTRATION = "orchestration"
+    MITRE_MAPPING = "mitre_mapping"
+    NETWORK_ANALYSIS = "network_analysis"
+    THREAT_INTEL = "threat_intel"
 
 
 class RetentionState(StrEnum):

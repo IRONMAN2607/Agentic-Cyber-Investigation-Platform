@@ -12,12 +12,9 @@ from typing import Any
 def get_not_implemented(settings: Any = None) -> list[str]:
     """Return declared capability limitations reflecting the active runtime configuration."""
     items: list[str] = [
-        "No threat-intelligence enrichment: indicator reputation was not queried.",
-        "No network analysis: PCAP, DNS and flow evidence are not processed.",
         "No endpoint or memory forensics: process, registry and memory artifacts are not examined.",
-        "No MITRE ATT&CK mapping: observed behaviour is not mapped to tactics or techniques.",
         "No hypothesis generation or validation: competing explanations are not enumerated "
-        "or tested against evidence.",
+        "or tested against evidence (scheduled for Phase 7).",
     ]
     if settings is not None and getattr(settings, "enable_llm_triage", False):
         items.append(
@@ -30,8 +27,11 @@ def get_not_implemented(settings: Any = None) -> list[str]:
             "deterministically from stored records."
         )
     items.append(
-        "Log parsing covers Linux authentication logs (sshd/sudo/PAM) and "
-        "Web server access logs (Nginx/Apache/W3C/Combined/CLF)."
+        "Parsing covers Linux authentication logs (sshd/sudo/PAM), Web server access logs "
+        "(Nginx/Apache/W3C), and PCAP packet captures."
+    )
+    items.append(
+        "Deterministic MITRE ATT&CK mapping is active for authentication and web attack rules."
     )
     return items
 
