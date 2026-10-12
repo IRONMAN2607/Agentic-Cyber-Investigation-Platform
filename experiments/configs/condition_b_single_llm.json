@@ -1,0 +1,11 @@
+{
+  "condition_id": "condition_b_single_llm",
+  "name": "Baseline B: Monolithic Single LLM",
+  "description": "One model prompted with all tools and instructed to cite evidence. No multi-agent decomposition, no graph, no runtime grounding invariant enforcement (post-hoc verified).",
+  "enable_graph": false,
+  "enable_reasoning": false,
+  "enable_hypotheses": false,
+  "enable_validation": false,
+  "planner": "none",
+  "grounding_enforcement": "prompted_only"
+}

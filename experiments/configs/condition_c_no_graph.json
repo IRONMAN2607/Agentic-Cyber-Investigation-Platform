@@ -1,0 +1,11 @@
+{
+  "condition_id": "condition_c_no_graph",
+  "name": "Baseline C: Multi-Agent Without Graph",
+  "description": "Full agent decomposition with strict grounding, but correlation agent and evidence graph traversal disabled.",
+  "enable_graph": false,
+  "enable_reasoning": false,
+  "enable_hypotheses": true,
+  "enable_validation": true,
+  "planner": "adaptive",
+  "grounding_enforcement": "strict"
+}

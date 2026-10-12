@@ -1,0 +1,11 @@
+{
+  "condition_id": "condition_d_proposed",
+  "name": "Proposed ACIP Multi-Agent Architecture",
+  "description": "Full pipeline: append-only evidence store, grounding invariants G0-G4, correlation agent, evidence graph BFS traversal, hypothesis agent (Invariant G3), validation agent, reasoning agent, adaptive planner.",
+  "enable_graph": true,
+  "enable_reasoning": true,
+  "enable_hypotheses": true,
+  "enable_validation": true,
+  "planner": "adaptive",
+  "grounding_enforcement": "strict"
+}

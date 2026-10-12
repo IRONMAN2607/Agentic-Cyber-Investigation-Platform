@@ -58,6 +58,10 @@ class HypothesisAgent(Agent):
         has_priv_esc = False
 
         for f in findings:
+            if f.severity == Severity.INFO.value or (f.detection_rule or "").endswith(
+                "parse_summary"
+            ):
+                continue
             for eid_str in f.evidence_ids:
                 try:
                     suspicious_evidence_ids.append(uuid.UUID(eid_str))
@@ -65,9 +69,14 @@ class HypothesisAgent(Agent):
                     pass
             rule = (f.detection_rule or "").lower()
             title = f.title.lower()
-            if "auth" in rule or "brute" in title or "password" in title:
+            if "bruteforce" in rule or "brute" in title or "preceded by failures" in title:
                 has_auth_anomaly = True
-            if "web" in rule or "injection" in title or "xss" in title or "traversal" in title:
+            if (
+                "sqli" in rule
+                or "traversal" in rule
+                or "injection" in title
+                or "traversal" in title
+            ):
                 has_web_anomaly = True
             if "sudo" in title or "privilege" in title or "esc" in rule:
                 has_priv_esc = True

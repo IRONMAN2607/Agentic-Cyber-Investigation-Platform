@@ -1,0 +1,11 @@
+{
+  "condition_id": "ablation_4_static_planner",
+  "name": "Ablation 4: Static Planner",
+  "description": "Full multi-agent pipeline with evidence graph, reasoning, hypotheses, and validation, but using StaticPlanner instead of AdaptivePlanner.",
+  "enable_graph": true,
+  "enable_reasoning": true,
+  "enable_hypotheses": true,
+  "enable_validation": true,
+  "planner": "static",
+  "grounding_enforcement": "strict"
+}

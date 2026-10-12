@@ -59,6 +59,20 @@ def build_parser() -> argparse.ArgumentParser:
         "restore", help="verify and restore a backup into empty configured paths"
     )
     restore.add_argument("source", type=Path)
+
+    benchmark = sub.add_parser("benchmark", help="run evaluation benchmark matrix across baselines")
+    benchmark.add_argument("--output-dir", type=Path, default=Path("experiments/results"))
+    benchmark.add_argument(
+        "--condition",
+        default="all",
+        choices=[
+            "all",
+            "condition_a_rules",
+            "condition_b_single_llm",
+            "condition_c_no_graph",
+            "condition_d_proposed",
+        ],
+    )
     return parser
 
 
@@ -78,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
             _backup(settings, args.destination)
         case "restore":
             _restore(settings, args.source)
+        case "benchmark":
+            return asyncio.run(_benchmark(settings, args.output_dir, args.condition))
         case "serve":
             return _serve(args.host, args.port, args.reload)
     return 0
@@ -151,6 +167,27 @@ def _restore(settings: Settings, source: Path) -> None:
     """Restore a verified backup only into empty configured storage."""
     restore_backup(source, settings)
     print(f"Verified backup restored from: {source.resolve()}")
+
+
+async def _benchmark(settings: Settings, output_dir: Path, condition: str) -> int:
+    database = Database(settings.database_url, echo=settings.db_echo)
+    try:
+        from experiments.results.report_generator import EvaluationReportGenerator
+        from experiments.runners.benchmark_runner import BenchmarkRunner
+
+        from acip.bootstrap import bootstrap
+
+        await bootstrap(database, settings)
+        runner = BenchmarkRunner(database=database, settings=settings)
+        conditions = None if condition == "all" else [condition]
+        suite = await runner.run_all(conditions=conditions)
+        md_file, json_file = EvaluationReportGenerator.save_results(suite, output_dir)
+        print(f"Benchmark run complete. Report saved to: {md_file}")
+        print(f"Raw metrics JSON saved to: {json_file}")
+        print("\n" + EvaluationReportGenerator.generate_markdown_table(suite))
+        return 0
+    finally:
+        await database.dispose()
 
 
 def _serve(host: str, port: int, reload: bool) -> int:

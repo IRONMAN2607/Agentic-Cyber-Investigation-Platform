@@ -1,0 +1,11 @@
+{
+  "condition_id": "condition_a_rules",
+  "name": "Baseline A: Deterministic Rule-Based",
+  "description": "Deterministic tools, auth/web log parsers, and static detection rules only. No language models or reasoning agents.",
+  "enable_graph": false,
+  "enable_reasoning": false,
+  "enable_hypotheses": false,
+  "enable_validation": false,
+  "planner": "static",
+  "grounding_enforcement": "strict"
+}
