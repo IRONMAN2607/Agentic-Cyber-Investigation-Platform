@@ -33,15 +33,16 @@ path rather than reimplemented as a comparison artefact.
 | 7 | Reasoning agents | **verified**; HypothesisAgent (G3), ValidationAgent (bounded loops), ReasoningAgent, AdaptivePlanner |
 | 8 | Frontend and interaction | **verified**; SVG Evidence Graph, interactive timeline, hypotheses/validation panel, SSE streaming |
 | 9 | Evaluation & benchmark harness | **verified**; Maximum Bipartite Matcher, Conditions A–D, Ablations 1–4, FPR & provenance metrics |
-| 10 | Writing & reproducibility | **active focus**; IEEE paper draft, reproduction scripts, benchmark packaging |
+| 10 | Writing & reproducibility | **complete**; IEEE paper draft, BibTeX, single-command reproduction scripts (POSIX + PowerShell), verified checksums |
 
 **"Verified" means a live command result, not a claim inferred from source.** Verified figures:
 
 ```text
-pytest                    215 passed
-ruff check src experiments tests      All checks passed!
-ruff format --check       158 files already formatted
-mypy src experiments tests            Success: no issues found in 158 source files
+pytest                                  215 passed
+reproduce_results.py                    REPRODUCIBILITY RUN COMPLETED (0 fabrications, 0.0 FPR, 1.0 provenance)
+ruff check src experiments tests scripts All checks passed!
+ruff format --check                     160 files already formatted
+mypy src experiments tests scripts      Success: no issues found in 159 source files
 ```
 
 The vertical slice executes end to end — `tests/scenarios/test_auth_log_scenario.py` runs create →

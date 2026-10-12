@@ -65,6 +65,16 @@ cp .env.example .env
 Then open `http://127.0.0.1:8000/docs`. `acip capabilities` prints the honest capability list
 without starting a server.
 
+### Reproducibility Runner
+
+To execute the complete empirical evaluation matrix across all conditions (A through D) and verify formal grounding invariants in one command:
+
+```bash
+python scripts/reproduce_results.py experiments/results
+```
+
+(Or `./scripts/reproduce.sh` on POSIX / `powershell scripts/reproduce.ps1` on Windows). Output reports and certified SHA256 checksums are stored in `experiments/results/`.
+
 ## Layout
 
 ```text
@@ -103,6 +113,7 @@ src/acip/
 | [experiments.md](docs/experiments.md) | Evaluation methodology, baselines, ablations, metrics |
 | [research.md](docs/research.md) | Research question and contribution |
 | [roadmap.md](docs/roadmap.md) | Phases and two-semester plan |
+| [paper/IEEE_PAPER_DRAFT.md](docs/paper/IEEE_PAPER_DRAFT.md) | IEEE conference research paper draft & formal proofs |
 | [deployment.md](docs/deployment.md) | Environments, configuration, operations |
 | [risks-and-assumptions.md](docs/risks-and-assumptions.md) | Architectural risks; assumptions needing confirmation |
 

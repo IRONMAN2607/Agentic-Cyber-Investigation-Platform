@@ -6,9 +6,9 @@
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1788861219.6823444,
-    "seen": 1788893624.9938214,
-    "ast_hash": "64e1284ec112aafa45137daa6788868f",
+    "mtime": 1791821804.0871673,
+    "seen": 1791821853.8694067,
+    "ast_hash": "909abf2f377c0866ffd7d2fd754080c0",
     "semantic_hash": ""
   },
   "src/acip/__init__.py": {
@@ -390,9 +390,9 @@
     "semantic_hash": ""
   },
   "docs/roadmap.md": {
-    "mtime": 1791818298.2652304,
-    "seen": 1791821572.0256827,
-    "ast_hash": "022801c17407731db46bc128c2445386",
+    "mtime": 1791821620.4335191,
+    "seen": 1791821853.8694067,
+    "ast_hash": "b0371319041912b35b4dce911008a4ce",
     "semantic_hash": ""
   },
   "docs/security.md": {
@@ -1092,9 +1092,9 @@
     "semantic_hash": ""
   },
   "experiments/results/benchmark_results.json": {
-    "mtime": 1791821426.5951426,
-    "seen": 1791821572.0256827,
-    "ast_hash": "61a09397f63ec8f33bd5edb8e77c4f6e",
+    "mtime": 1791821834.0304024,
+    "seen": 1791821853.8694067,
+    "ast_hash": "8732a23026c5be568035386906e43e7c",
     "semantic_hash": ""
   },
   "experiments/results/report_generator.py": {
@@ -1188,9 +1188,33 @@
     "semantic_hash": ""
   },
   "experiments/results/EVALUATION_REPORT.md": {
-    "mtime": 1791821426.5941248,
-    "seen": 1791821572.0256827,
+    "mtime": 1791821834.0286174,
+    "seen": 1791821853.8694067,
     "ast_hash": "990a354e22f9bf2dae2cdb3eb8de9437",
+    "semantic_hash": ""
+  },
+  "scripts/reproduce.ps1": {
+    "mtime": 1791821678.047639,
+    "seen": 1791821853.8694067,
+    "ast_hash": "46ec65b7c002e7e3a0d7776d207dfc91",
+    "semantic_hash": ""
+  },
+  "scripts/reproduce.sh": {
+    "mtime": 1791821684.3599744,
+    "seen": 1791821853.8694067,
+    "ast_hash": "49e4a1f1cf9af0534ebd87b6c4a5115c",
+    "semantic_hash": ""
+  },
+  "scripts/reproduce_results.py": {
+    "mtime": 1791821790.8896525,
+    "seen": 1791821853.8694067,
+    "ast_hash": "4bb078e99be0fef1e8abae597de708d7",
+    "semantic_hash": ""
+  },
+  "docs/paper/IEEE_PAPER_DRAFT.md": {
+    "mtime": 1791821771.864318,
+    "seen": 1791821853.8694067,
+    "ast_hash": "698d3fafba9692ec4fc3d83df10de05f",
     "semantic_hash": ""
   }
 }

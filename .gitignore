@@ -18,6 +18,9 @@ dist/
 # Runtime data: artifacts are potentially malicious, never commit them
 data/
 !data/.gitkeep
+*.db
+*.db-journal
+experiments/results/artifacts/
 
 # Datasets are large and often licence-restricted; commit manifests only
 datasets/**/raw/
