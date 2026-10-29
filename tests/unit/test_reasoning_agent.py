@@ -16,12 +16,16 @@ from acip.db.models import AgentRun, Entity, EntityEdge, Finding, Investigation,
 from acip.db.session import Database
 from acip.tools.registry import build_default_registry
 from acip.tools.runner import ToolRunner
-from acip.types import AssertionClass, EvidenceKind, RunStatus
+from acip.types import AssertionClass, EvidenceKind, RunStatus, Severity
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "initial_outcome",
+    ["failure", "success"],
+)
 async def test_reasoning_agent_discovers_attack_chains_over_graph(
-    database: Database, tmp_path: Path
+    database: Database, tmp_path: Path, initial_outcome: str
 ) -> None:
     settings = Settings(
         environment="test",
@@ -71,7 +75,7 @@ async def test_reasoning_agent_discovers_attack_chains_over_graph(
         ev1 = EvidenceDraft(
             kind=EvidenceKind.AUTH_EVENT,
             data={
-                "outcome": "failure",
+                "outcome": initial_outcome,
                 "source_ip": "198.51.100.44",
                 "user": "alice",
                 "host": "srv1",
@@ -154,6 +158,12 @@ async def test_reasoning_agent_discovers_attack_chains_over_graph(
         result = await agent.run(ctx, {})
 
         assert result.status == RunStatus.SUCCEEDED
+        if initial_outcome == "success":
+            assert result.metrics["chains_discovered"] == 0
+            all_findings = await store.list_findings()
+            assert all(f.severity == Severity.INFO.value for f in all_findings)
+            return
+
         assert result.metrics["chains_discovered"] >= 1
         assert len(result.finding_ids) >= 1
 

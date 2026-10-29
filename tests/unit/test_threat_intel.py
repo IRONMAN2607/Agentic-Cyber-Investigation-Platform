@@ -28,7 +28,8 @@ async def test_threat_intel_malicious_ip_lookup() -> None:
     assert ev.data["indicator"] == "198.51.100.23"
     assert ev.data["abuse_score"] == 100
     assert ev.data["is_malicious"] is True
-    assert ev.data["source"] == "AbuseIPDB"
+    assert ev.data["source"] == "local_deterministic_feed"
+    assert ev.data["reputation_status"] == "malicious"
 
 
 @pytest.mark.asyncio
@@ -50,6 +51,21 @@ async def test_threat_intel_benign_indicator_lookup() -> None:
     assert ev.data["indicator"] == "192.0.2.1"
     assert ev.data["abuse_score"] == 0
     assert ev.data["is_malicious"] is False
+    assert ev.data["reputation_status"] == "benign"
+
+
+@pytest.mark.asyncio
+async def test_threat_intel_unknown_indicator_is_not_clean() -> None:
+    tool = ThreatIntelTool()
+    ctx = ToolContext(investigation_id=uuid.uuid4())
+
+    result = await tool.execute(
+        ThreatIntelArgs(indicator="unknown.example", indicator_type="domain"), ctx
+    )
+
+    assert result.evidence[0].data["reputation_status"] == "unknown"
+    assert result.evidence[0].data["is_malicious"] is None
+    assert result.evidence[0].data["abuse_score"] is None
 
 
 @pytest.mark.asyncio

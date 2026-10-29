@@ -1074,6 +1074,110 @@ pre.report-content {
   margin-bottom: 0.5rem;
 }
 
+/* --- AI Executive Layman Summary (NVIDIA Nemotron 3 Ultra 550B) --- */
+.btn-ai-summary {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(56, 189, 248, 0.18));
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #34d399;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-ai-summary:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(56, 189, 248, 0.3));
+  border-color: #34d399;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.35);
+}
+.btn-ai-summary:active {
+  transform: translateY(0);
+}
+
+.ai-badge-nemotron {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #76b900;
+  background-color: rgba(118, 185, 0, 0.12);
+  border: 1px solid rgba(118, 185, 0, 0.4);
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+
+.summary-hero-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85));
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  padding: 1.15rem 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.summary-section-box {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.summary-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.925rem;
+  color: var(--brand-primary);
+  margin-bottom: 0.6rem;
+}
+
+.summary-conclusion-box {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(15, 23, 42, 0.85));
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  padding: 1.15rem 1.25rem;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.12);
+}
+
+.summary-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.checklist-bullet {
+  color: var(--brand-primary);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ai-sparkle-icon {
+  font-size: 1.2rem;
+  display: inline-block;
+  animation: sparkleRotate 3s infinite ease-in-out;
+}
+
+@keyframes sparkleRotate {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.15) rotate(10deg); }
+}
+
 /* Reduced Motion Accessibility */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

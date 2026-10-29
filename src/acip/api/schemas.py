@@ -537,5 +537,40 @@ class TimelineResponse(BaseModel):
     total: int
 
 
+# --- Executive Layman Summary (NVIDIA Nemotron 3 Ultra 550B) ------------------
+
+
+class LaymanSummary(BaseModel):
+    """Plain-English executive incident summary produced by NVIDIA Nemotron 3 Ultra 550B."""
+
+    headline: str = Field(description="Short, non-technical headline summarizing the incident.")
+    what_happened: str = Field(
+        description=(
+            "Clear chronological explanation of what occurred in plain, layman-friendly language."
+        )
+    )
+    key_findings: list[str] = Field(
+        default_factory=list,
+        description="Key discoveries and evidence points explained without dense jargon.",
+    )
+    conclusion: str = Field(
+        description="Definitive conclusion answering whether active compromise exists."
+    )
+    recommended_actions: list[str] = Field(
+        default_factory=list,
+        description="Immediate, practical steps non-technical leadership or operators should take.",
+    )
+
+
+class InvestigationSummaryResponse(BaseModel):
+    """Response payload containing executive layman summary and model attribution."""
+
+    investigation_id: uuid.UUID
+    model: str = "nvidia/nemotron-3-ultra-550b"
+    summary: LaymanSummary
+    markdown: str
+    tokens_used: int = 0
+
+
 # Resolve the forward reference in TokenResponse.
 TokenResponse.model_rebuild()

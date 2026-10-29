@@ -68,6 +68,11 @@ _DEFANG_SUBSTITUTIONS = (
     ("[@]", "@"),
 )
 
+_COMPILED_DEFANG: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(re.escape(needle), re.IGNORECASE), replacement)
+    for needle, replacement in _DEFANG_SUBSTITUTIONS
+)
+
 _ENTITY_FOR_IOC: dict[str, EntityType] = {
     "url": EntityType.URL,
     "email": EntityType.EMAIL,
@@ -165,8 +170,7 @@ class IOCExtractor(ToolAdapter):
                         **extra,
                     }
                 found[key]["occurrences"] += 1
-                for index in range(match.start(), match.end()):
-                    masked[index] = "\x00"
+                masked[match.start() : match.end()] = ["\x00"] * (match.end() - match.start())
 
         if truncated:
             warnings.append(f"extraction truncated at max_iocs={args.max_iocs}")
@@ -210,11 +214,9 @@ def _refang(text: str) -> tuple[str, bool]:
     """Undo common defanging so indicators can be matched."""
     result = text
     changed = False
-    for needle, replacement in _DEFANG_SUBSTITUTIONS:
-        if needle in result or needle.upper() in result:
-            pattern = re.compile(re.escape(needle), re.IGNORECASE)
-            result, count = pattern.subn(replacement, result)
-            changed = changed or count > 0
+    for pattern, replacement in _COMPILED_DEFANG:
+        result, count = pattern.subn(replacement, result)
+        changed = changed or count > 0
     return result, changed
 
 

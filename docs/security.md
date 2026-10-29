@@ -20,7 +20,7 @@ common way tools like this get compromised:
 | 2 | Token authentication | implemented | `core/security/tokens.py` |
 | 3 | Role-based authorization | implemented | `core/security/authz.py` |
 | 4 | Secret management | partial | `config.py` |
-| 5 | Third-party API key protection | not implemented | Phase 4 |
+| 5 | Third-party API key protection | not applicable to current local feed; external adapters not implemented | Future network tools |
 | 6 | Request input validation | implemented | Pydantic at every boundary |
 | 7 | File upload validation | implemented | `core/security/files.py` |
 | 8 | Path traversal prevention | implemented | `core/security/files.py` |
@@ -213,7 +213,7 @@ disclosure is recorded in `threat_intel_lookups`. See [tools.md](tools.md) §san
 
 ## 9. Rate limiting and resource exhaustion
 
-**Not implemented.** Required before any non-localhost deployment. Four distinct limits, because
+**Implemented for the current single-process localhost deployment; not distributed.** Four distinct limits, because
 they protect different resources:
 
 | Endpoint | Resource at risk | Limit |
@@ -291,5 +291,6 @@ specified in [testing.md](testing.md) and is part of Phase 1′:
   redirect-to-internal — written **with** the URL tool, not after it.
 - Grounding: an agent cannot write a `FACT` without tool-backed evidence.
 
-Until those tests exist and pass, the correct summary of this document's status column is *designed
-and coded, not verified* — which is what §1's rule requires it to say.
+The current security suite executes and passes these checks. The status column still does not imply
+readiness for shared, remote, or production deployment: object-level authorization, token revocation,
+container isolation, TLS termination, and distributed limits remain outside the supported boundary.

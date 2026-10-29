@@ -267,7 +267,10 @@
             <span>Status: <span class="badge badge-${inv.status}">${inv.status}</span></span>
           </div>
         </div>
-        <div style="display: flex; gap: 0.6rem; align-items: center;">
+        <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-ai-summary" onclick="window.acipGenerateAISummary('${inv.id}')" title="Summarize Incident &amp; Findings in plain English using NVIDIA Nemotron 3 Ultra 550B">
+            ✨ AI Summary
+          </button>
           ${inv.status === "created" ? `
             <button class="btn btn-secondary" onclick="window.acipOpenUpload('${inv.id}')">+ Upload Artifact</button>
             <button class="btn btn-primary" onclick="window.acipStartInvestigation('${inv.id}')">▶ Start Run</button>
@@ -638,7 +641,8 @@
         <div id="section-report" class="section-card" style="display: ${activeTab === 'all' || activeTab === 'report' ? 'block' : 'none'};">
           <div class="section-card-header">
             <span>Executive Investigation Report</span>
-            <div style="display: flex; gap: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <button class="btn btn-ai-summary btn-sm" onclick="window.acipGenerateAISummary('${inv.id}')">✨ AI Summary</button>
               <button id="btn-toggle-raw-report" class="btn btn-outline btn-sm" onclick="window.acipToggleReportView()">View Raw Markdown</button>
               <button id="btn-copy-report" class="btn btn-primary btn-sm" onclick="window.acipCopyReport()">Copy Report</button>
             </div>
@@ -1042,6 +1046,136 @@
       container.innerHTML = `<div style="color: var(--sev-critical); padding: 1rem;">Failed to fetch capabilities: ${escapeHtml(e.message)}</div>`;
     }
   };
+
+  // --- AI Executive Layman Summary (NVIDIA Nemotron 3 Ultra 550B) ---
+  let cachedAISummaryMarkdown = "";
+
+  window.acipGenerateAISummary = async (invId) => {
+    const modal = document.getElementById("modal-ai-summary");
+    const container = document.getElementById("ai-summary-content");
+    if (!modal || !container) return;
+
+    modal.showModal();
+    container.innerHTML = `
+      <div style="padding: 3rem 1.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+        <div class="pulse-indicator" style="width: 24px; height: 24px; background-color: #10b981;"></div>
+        <div style="font-weight: 600; color: var(--text-primary); font-size: 1.05rem;">Thinking &amp; Synthesizing Incident...</div>
+        <div style="color: var(--text-muted); font-size: 0.85rem; max-width: 480px; line-height: 1.5;">
+          <strong>NVIDIA Nemotron 3 Ultra 550B</strong> (<code>nvidia/nemotron-3-ultra-550b</code>) is distilling investigation evidence, timeline correlations, and findings into a plain-English layman executive summary.
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await api(`/investigations/${invId}/summarize`, { method: "POST" });
+      const s = res.summary;
+      cachedAISummaryMarkdown = res.markdown;
+
+      container.innerHTML = `
+        <!-- Headline Card -->
+        <div class="summary-hero-card">
+          <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #34d399; font-weight: 700; margin-bottom: 0.35rem;">
+            Executive Incident Headline
+          </div>
+          <h2 style="margin: 0; font-size: 1.2rem; color: #ffffff; line-height: 1.4; font-weight: 700;">
+            ${escapeHtml(s.headline)}
+          </h2>
+        </div>
+
+        <!-- What Happened -->
+        <div class="summary-section-box">
+          <div class="summary-section-title">
+            <span>📖</span> What Happened (Plain English)
+          </div>
+          <p style="margin: 0; line-height: 1.6; color: #e2e8f0; font-size: 0.925rem;">
+            ${escapeHtml(s.what_happened)}
+          </p>
+        </div>
+
+        <!-- Key Findings -->
+        <div class="summary-section-box">
+          <div class="summary-section-title">
+            <span>🔍</span> What Was Found
+          </div>
+          <ul class="summary-checklist">
+            ${(s.key_findings || []).map(f => `
+              <li>
+                <span class="checklist-bullet">▸</span>
+                <span>${escapeHtml(f)}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+
+        <!-- Investigation Conclusion -->
+        <div class="summary-conclusion-box">
+          <div class="summary-section-title" style="color: #38bdf8;">
+            <span>🛡️</span> Investigation Conclusion
+          </div>
+          <p style="margin: 0; line-height: 1.6; color: #f8fafc; font-size: 0.925rem; font-weight: 500;">
+            ${escapeHtml(s.conclusion)}
+          </p>
+        </div>
+
+        <!-- Recommended Actions -->
+        ${(s.recommended_actions && s.recommended_actions.length > 0) ? `
+          <div class="summary-section-box" style="border-left: 3px solid #10b981;">
+            <div class="summary-section-title" style="color: #34d399;">
+              <span>✅</span> Recommended Actions
+            </div>
+            <ul class="summary-checklist">
+              ${s.recommended_actions.map(act => `
+                <li>
+                  <span class="checklist-bullet" style="color: #34d399;">✓</span>
+                  <span>${escapeHtml(act)}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : ''}
+
+        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem;">
+          <span>Model Attribution: <code>${escapeHtml(res.model)}</code></span>
+          <span>Tokens Used: <strong>${res.tokens_used || 0}</strong></span>
+        </div>
+      `;
+    } catch (err) {
+      container.innerHTML = `
+        <div style="padding: 2.5rem 1.5rem; color: var(--sev-critical); text-align: center;">
+          <div style="font-size: 1.6rem; margin-bottom: 0.5rem;">⚠️</div>
+          <div style="font-weight: 700; font-size: 1rem;">Failed to Generate AI Summary</div>
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem; max-width: 450px; margin-inline: auto;">${escapeHtml(err.message)}</div>
+        </div>
+      `;
+    }
+  };
+
+  window.acipCopyAISummary = () => {
+    if (!cachedAISummaryMarkdown) {
+      showToast("No summary available to copy", "error");
+      return;
+    }
+    navigator.clipboard.writeText(cachedAISummaryMarkdown).then(
+      () => showToast("Executive Layman Summary copied to clipboard!", "success"),
+      () => showToast("Failed to copy summary to clipboard", "error")
+    );
+  };
+
+  const aiSummaryModal = document.getElementById("modal-ai-summary");
+  if (aiSummaryModal) {
+    aiSummaryModal.addEventListener("click", (e) => {
+      const rect = aiSummaryModal.getBoundingClientRect();
+      const isInDialog = (
+        rect.top <= e.clientY &&
+        e.clientY <= rect.top + rect.height &&
+        rect.left <= e.clientX &&
+        e.clientX <= rect.left + rect.width
+      );
+      if (!isInDialog) {
+        aiSummaryModal.close();
+      }
+    });
+  }
 
   // --- Event Listeners ---
   document.getElementById("btn-login-modal").addEventListener("click", () => {

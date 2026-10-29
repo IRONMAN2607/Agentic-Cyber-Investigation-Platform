@@ -4,8 +4,10 @@ Covers §21–§23. The research questions are in [research.md](research.md); th
 each is measured, what the comparison conditions are, and which parts of the design are not yet
 settled.
 
-Nothing here has been run. No dataset has been obtained, no baseline exists, and no metric harness has
-been written. This is the plan.
+The benchmark harness and metric tests are implemented. The committed results use the repository's
+synthetic labelled scenarios and deterministic/replay paths; they are reproducible engineering
+artifacts, not evidence that a public external corpus or a live hosted model comparison has been
+completed. External dataset licensing, labels, and provider terms remain open research assumptions.
 
 ## 1. Design
 

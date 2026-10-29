@@ -169,6 +169,16 @@ python -m acip.cli benchmark --condition all --output-dir experiments/results
 ```
 Runs the evaluation matrix across all baseline conditions (Rules, Single LLM, Multi-Agent without Graph, and Proposed ACIP) and outputs a markdown table comparing Precision, Recall, and F1 scores.
 
+### Load the Complete Sample Catalog
+```bash
+python -m acip.cli seed-samples
+```
+This creates and evaluates 16 synthetic investigations: a high-risk and a
+low-risk example for each of Domain, URL, IP, Hash, File, Log, PCAP, and
+Incident Description. Use `--no-run` when you only want the entries and their
+safe sample artifacts. The full catalog is documented in
+[docs/sample-investigations.md](sample-investigations.md).
+
 ---
 
 ## 7. Plain-English Concept Glossary

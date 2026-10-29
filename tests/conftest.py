@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -35,7 +36,7 @@ def _reset_rate_limiters() -> Iterator[None]:
 
 
 @pytest.fixture
-def settings(tmp_path: Path) -> Settings:
+def settings(tmp_path: Path, request: Any) -> Settings:
     db_file = tmp_path / "test.db"
     artifact_dir = tmp_path / "artifacts"
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -48,7 +49,7 @@ def settings(tmp_path: Path) -> Settings:
         bootstrap_admin_password=SecretStr("admin-password-123"),
         access_token_ttl_minutes=60,
         enable_llm_triage=False,
-        enable_adaptive_planning=False,
+        enable_adaptive_planning=bool(getattr(request, "param", False)),
     )
 
 

@@ -70,7 +70,7 @@ class PcapParser(ToolAdapter):
 
     name: ClassVar[str] = "pcap_parser"
     version: ClassVar[str] = "0.1.0"
-    tier: ClassVar[SandboxTier] = SandboxTier.T1_SUBPROCESS
+    tier: ClassVar[SandboxTier] = SandboxTier.T0_IN_PROCESS
     args_model: ClassVar[type[BaseModel]] = PcapParserArgs
     requires_artifact: ClassVar[bool] = True
 

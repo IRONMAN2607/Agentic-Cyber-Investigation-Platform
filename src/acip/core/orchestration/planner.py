@@ -109,21 +109,22 @@ class StaticPlanner:
                     ),
                 )
             )
-            if self._registry.has("mitre"):
-                tasks.append(
-                    Task(
-                        task_id="t3-mitre",
-                        agent_name="mitre",
-                        rationale=(
-                            "Maps observed detection rule findings deterministically to "
-                            "verified MITRE ATT&CK Enterprise tactics and techniques."
-                        ),
-                    )
-                )
         else:
             notes.append(
                 "Log analysis was not scheduled: no submitted artifact could plausibly "
                 "contain authentication or web access records."
+            )
+
+        if self._registry.has("mitre"):
+            tasks.append(
+                Task(
+                    task_id=f"t{len(tasks) + 1}-mitre",
+                    agent_name="mitre",
+                    rationale=(
+                        "Maps observed detection rule findings deterministically to "
+                        "verified MITRE ATT&CK Enterprise tactics and techniques."
+                    ),
+                )
             )
 
         if self._registry.has("correlation"):

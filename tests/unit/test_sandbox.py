@@ -22,16 +22,14 @@ async def test_sandbox_exec_success(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_sandbox_environment_stripped() -> None:
-    import os
-
-    os.environ["SECRET_API_KEY_TEST"] = "super-secret"
+async def test_sandbox_environment_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACIP_TEST_SENTINEL", "sentinel-value")
 
     res = await run_subprocess_sandboxed(
         [
             sys.executable,
             "-c",
-            "import os; print(os.environ.get('SECRET_API_KEY_TEST', 'NOT_FOUND'))",
+            "import os; print(os.environ.get('ACIP_TEST_SENTINEL', 'NOT_FOUND'))",
         ],
         timeout_seconds=5.0,
     )

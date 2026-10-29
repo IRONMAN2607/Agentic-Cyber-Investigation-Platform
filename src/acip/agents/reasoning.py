@@ -48,6 +48,8 @@ class ReasoningAgent(Agent):
             )
 
         entities_by_id = {e.id: e for e in graph.entities}
+        evidence_rows, _ = await ctx.store.all_evidence(cap=10_000)
+        evidence_by_id = {e.id: e for e in evidence_rows}
 
         # Identify candidate entry points (IPs) and candidate target assets (Users, Hosts)
         ip_entities = [e for e in graph.entities if e.type == "ip"]
@@ -66,6 +68,11 @@ class ReasoningAgent(Agent):
                 for path in paths:
                     edges_in_path = path
                     evidence_ids: list[uuid.UUID] = [e.evidence_id for e in edges_in_path]
+                    path_evidence = [
+                        evidence_by_id[eid] for eid in evidence_ids if eid in evidence_by_id
+                    ]
+                    if not any(_is_suspicious_evidence(row) for row in path_evidence):
+                        continue
 
                     path_repr: list[str] = []
                     for e in edges_in_path:
@@ -120,9 +127,7 @@ class ReasoningAgent(Agent):
                 cited_ev = [e.id for e in all_ev]
 
             rel_str = ", ".join(sorted(relations_found)) if relations_found else "None"
-            assertion_cls = (
-                AssertionClass.INFERENCE if cited_ev else AssertionClass.HYPOTHESIS
-            )
+            assertion_cls = AssertionClass.INFERENCE if cited_ev else AssertionClass.HYPOTHESIS
             summary_finding = await ctx.store.add_finding(
                 FindingDraft(
                     title="Graph Reasoning: Cross-Source Activity Correlation",
@@ -162,3 +167,13 @@ class ReasoningAgent(Agent):
             next_actions=[],
             errors=[],
         )
+
+
+def _is_suspicious_evidence(evidence: Any) -> bool:
+    """Return whether an observation supports an attack-chain interpretation."""
+    data = evidence.data or {}
+    if evidence.kind in {"web_attack", "threat_intel"}:
+        return evidence.kind == "web_attack" or data.get("reputation_status") == "malicious"
+    if data.get("event_type") == "sudo_command":
+        return True
+    return data.get("outcome") == "failure"

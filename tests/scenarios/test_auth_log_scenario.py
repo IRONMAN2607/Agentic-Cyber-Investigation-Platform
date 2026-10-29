@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from httpx import AsyncClient
 
 from acip.types import InvestigationStatus, Role, Severity
@@ -29,6 +30,9 @@ CLEAN_LOG_FIXTURE = "\n".join(
         "",
     ]
 )
+
+
+pytestmark = pytest.mark.parametrize("settings", [False, True], indirect=True)
 
 
 async def test_auth_log_incident_scenario(

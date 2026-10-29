@@ -50,10 +50,12 @@ class RoutingPolicy:
         provider_name: str = "nvidia",
         nemotron_model: str | None = None,
         deepseek_model: str | None = None,
+        nemotron_summary_model: str | None = None,
     ) -> RoutingPolicy:
         """Create standard routing policy with Llama 3.2 11B and GPT-OSS 20B candidates."""
         primary = nemotron_model or primary_model
         secondary = deepseek_model or secondary_model
+        summary = nemotron_summary_model or "nvidia/nemotron-3-ultra-550b"
 
         primary_candidate = CandidateModel(
             provider=provider_name,
@@ -65,6 +67,12 @@ class RoutingPolicy:
             provider=provider_name,
             model=secondary,
             temperature=0.0,
+            max_tokens=4096,
+        )
+        summary_candidate = CandidateModel(
+            provider=provider_name,
+            model=summary,
+            temperature=0.2,
             max_tokens=4096,
         )
 
@@ -109,7 +117,7 @@ class RoutingPolicy:
             ),
             TaskClass.NARRATIVE: TaskRoutingRule(
                 task_class=TaskClass.NARRATIVE,
-                candidates=[primary_candidate, secondary_candidate],
+                candidates=[summary_candidate, primary_candidate, secondary_candidate],
                 max_output_tokens=4096,
                 schema_retries=2,
             ),

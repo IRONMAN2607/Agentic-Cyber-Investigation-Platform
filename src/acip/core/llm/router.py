@@ -391,11 +391,18 @@ class ModelRouter:
 def build_default_router(settings: Any) -> ModelRouter:
     """Construct a default ModelRouter from application settings."""
     from acip.core.llm.providers.nvidia import NvidiaNIMProvider
-    from acip.core.llm.providers.replay import DEFAULT_TRIAGE_RESPONSE, ReplayProvider
+    from acip.core.llm.providers.replay import (
+        DEFAULT_SUMMARY_RESPONSE,
+        DEFAULT_TRIAGE_RESPONSE,
+        ReplayProvider,
+    )
 
     policy = RoutingPolicy.create_default(
         nemotron_model=settings.model_nemotron,
         deepseek_model=settings.model_deepseek,
+        nemotron_summary_model=getattr(
+            settings, "model_nemotron_summary", "nvidia/nemotron-3-ultra-550b"
+        ),
     )
     providers: dict[str, LLMProvider] = {}
     nvidia_key = settings.nvidia_api_key.get_secret_value()
@@ -404,7 +411,12 @@ def build_default_router(settings: Any) -> ModelRouter:
         providers["nvidia"] = ReplayProvider(
             name="nvidia",
             default_response=DEFAULT_TRIAGE_RESPONSE,
-            canned_responses={"triage": DEFAULT_TRIAGE_RESPONSE},
+            canned_responses={
+                "triage": DEFAULT_TRIAGE_RESPONSE,
+                "layman": DEFAULT_SUMMARY_RESPONSE,
+                "summary": DEFAULT_SUMMARY_RESPONSE,
+                "what_happened": DEFAULT_SUMMARY_RESPONSE,
+            },
         )
     elif nvidia_key:
         providers["nvidia"] = NvidiaNIMProvider(

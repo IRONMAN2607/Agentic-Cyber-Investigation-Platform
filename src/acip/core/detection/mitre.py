@@ -165,6 +165,38 @@ ATTACK_CATALOG: Final[dict[str, AttackTechnique]] = {
         description="Adversaries may communicate using the Domain Name System (DNS) protocol.",
         is_subtechnique=True,
     ),
+    "T1566": AttackTechnique(
+        id="T1566",
+        name="Phishing",
+        tactic="initial-access",
+        description="Adversaries may send phishing messages to gain access to victim systems.",
+    ),
+    "T1566.002": AttackTechnique(
+        id="T1566.002",
+        name="Spearphishing Link",
+        tactic="initial-access",
+        description=(
+            "Adversaries may send spearphishing messages with a link to an "
+            "attacker-controlled site."
+        ),
+        is_subtechnique=True,
+    ),
+    "T1583": AttackTechnique(
+        id="T1583",
+        name="Acquire Infrastructure",
+        tactic="resource-development",
+        description="Adversaries may acquire infrastructure such as domains to support operations.",
+    ),
+    "T1583.001": AttackTechnique(
+        id="T1583.001",
+        name="Domains",
+        tactic="resource-development",
+        description=(
+            "Adversaries may register or acquire domains that imitate legitimate "
+            "sites (typosquatting)."
+        ),
+        is_subtechnique=True,
+    ),
 }
 
 # Deterministic detection rule to ATT&CK technique mapping
@@ -183,6 +215,11 @@ RULE_TO_ATTACK_MAP: Final[dict[str, str]] = {
     "R-WEB-006": "T1595.002",  # Scanner -> Vulnerability Scanning
     "R-WEB-007": "T1595",  # Error Burst -> Active Scanning
     "R-WEB-008": "T1190",  # Successful Exploit -> Exploit Public-Facing Application
+    # URL and Domain rules
+    "R-URL-001": "T1583.001",  # Brand Impersonation / Typosquatting -> Domains
+    "R-URL-002": "T1583.001",  # Subdomain Spoofing -> Domains
+    "R-URL-003": "T1566.002",  # Phishing Lure -> Spearphishing Link
+    "R-URL-004": "T1566.002",  # Credential Phishing Campaign -> Spearphishing Link
 }
 
 

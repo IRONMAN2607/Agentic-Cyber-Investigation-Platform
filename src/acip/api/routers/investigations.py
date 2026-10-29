@@ -37,7 +37,9 @@ from acip.api.schemas import (
     InvestigationDetail,
     InvestigationProgress,
     InvestigationResponse,
+    InvestigationSummaryResponse,
     InvestigationUpdate,
+    LaymanSummary,
     ModelExecutionResponse,
     PagedEvidence,
     ProvenanceChainResponse,
@@ -54,6 +56,7 @@ from acip.api.schemas import (
 from acip.core import audit
 from acip.core.evidence.store import MAX_EVIDENCE_PAGE, EvidenceStore
 from acip.core.graph.traversal import GraphTraversal
+from acip.core.llm.contracts import ChatMessage, MessageRole
 from acip.core.security.files import store_bytes, store_stream
 from acip.core.security.ratelimit import investigation_limiter, rate_limit
 from acip.core.security.ssrf import SafeHTTPFetcher
@@ -80,6 +83,7 @@ from acip.types import (
     InvestigationStatus,
     RetentionState,
     TargetType,
+    TaskClass,
     TaskStatus,
 )
 
@@ -844,6 +848,160 @@ async def get_report(
         detail={"investigation_id": str(investigation.id)},
     )
     return ReportResponse.model_validate(report)
+
+
+@router.post("/{investigation_id}/summarize", response_model=InvestigationSummaryResponse)
+async def summarize_investigation(
+    investigation: LoadedInvestigation,
+    user: CurrentUser,
+    services: Annotated[Services, Depends(get_services)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> InvestigationSummaryResponse:
+    """Generate an executive plain-English layman summary using NVIDIA Nemotron 3 Ultra 550B."""
+    # 1. Fetch findings
+    findings = list(
+        (
+            await session.scalars(
+                sa.select(Finding)
+                .where(Finding.investigation_id == investigation.id)
+                .order_by(Finding.severity.desc())
+            )
+        ).all()
+    )
+
+    # 2. Fetch latest report (if available)
+    report = await session.scalar(
+        sa.select(Report)
+        .where(Report.investigation_id == investigation.id)
+        .order_by(Report.generated_at.desc())
+        .limit(1)
+    )
+
+    # 3. Fetch hypotheses (if available)
+    hypotheses = list(
+        (
+            await session.scalars(
+                sa.select(Hypothesis).where(Hypothesis.investigation_id == investigation.id)
+            )
+        ).all()
+    )
+
+    findings_summary = (
+        "\n".join(
+            f"- [{f.severity.upper()}] {f.title}: {f.description} "
+            f"(Confidence: {int(f.confidence * 100)}%)"
+            for f in findings
+        )
+        if findings
+        else "No grounded security findings recorded."
+    )
+
+    hypotheses_summary = (
+        "\n".join(f"- {h.statement} (Status: {h.status})" for h in hypotheses)
+        if hypotheses
+        else "No competing hypotheses formulated."
+    )
+
+    risk_display = investigation.risk_score if investigation.risk_score is not None else 0
+    report_excerpt = report.content[:2000] if report else "No report generated yet."
+
+    prompt = (
+        f"Investigation Title: {investigation.title}\n"
+        f"Target Type: {investigation.target_type}\n"
+        f"Target Value: {investigation.target_value}\n"
+        f"Status: {investigation.status}\n"
+        f"Severity: {investigation.severity or 'info'}\n"
+        f"Blended Risk Score: {risk_display} / 100\n\n"
+        f"Grounded Findings:\n{findings_summary}\n\n"
+        f"Hypotheses Evaluated:\n{hypotheses_summary}\n\n"
+        f"Report Context:\n{report_excerpt}\n\n"
+        "Generate a clear, objective executive summary in layman terms using "
+        "NVIDIA Nemotron 3 Ultra 550B. Explain what happened chronologically, "
+        "what was found without dense jargon, the definitive conclusion on "
+        "whether systems are compromised, and recommended practical next steps."
+    )
+
+    summary_model_name = getattr(
+        services.settings, "model_nemotron_summary", "nvidia/nemotron-3-ultra-550b"
+    )
+
+    router = services.router
+    if router is None:
+        from acip.core.llm.router import build_default_router
+
+        router = build_default_router(services.settings)
+        services.router = router
+
+    parsed_summary, response = await router.complete(
+        TaskClass.NARRATIVE,
+        messages=[
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=(
+                    f"You are {summary_model_name}, an expert cybersecurity AI advisor. "
+                    "Your mission is to summarize technical incidents and investigations into "
+                    "plain English for non-technical leadership and executives. Be clear and calm."
+                ),
+            ),
+            ChatMessage(role=MessageRole.USER, content=prompt),
+        ],
+        schema=LaymanSummary,
+        investigation_id=investigation.id,
+        prompt_name="layman_summary",
+        prompt_version="v1",
+        session=session,
+    )
+
+    if parsed_summary is None:
+        what_happened_fallback = (
+            response.content.strip()
+            if response and response.content.strip()
+            else "Investigation concluded with collected telemetry."
+        )
+        parsed_summary = LaymanSummary(
+            headline=f"Executive Summary for {investigation.title}",
+            what_happened=what_happened_fallback,
+            key_findings=[f.title for f in findings] or ["Evaluation completed."],
+            conclusion=(
+                f"Overall status is {investigation.status} with risk score "
+                f"{investigation.risk_score or 0}/100."
+            ),
+            recommended_actions=["Review system access logs and maintain regular monitoring."],
+        )
+
+    findings_md = "\n".join(f"- {kf}" for kf in parsed_summary.key_findings)
+    actions_md = "\n".join(f"- {ra}" for ra in parsed_summary.recommended_actions)
+    markdown_content = (
+        f"# Executive Incident Summary\n\n"
+        f"**Model Attribution:** `{summary_model_name}`  \n"
+        f"**Target:** `{investigation.target_value}` ({investigation.target_type})  \n"
+        f"**Risk Assessment:** {investigation.risk_score or 0} / 100 "
+        f"({investigation.severity or 'info'})\n\n"
+        f"## {parsed_summary.headline}\n\n"
+        f"### What Happened\n{parsed_summary.what_happened}\n\n"
+        f"### Key Findings\n{findings_md}\n\n"
+        f"### Conclusion\n{parsed_summary.conclusion}\n\n"
+        f"### Recommended Actions\n{actions_md}\n"
+    )
+
+    await audit.record(
+        session,
+        actor=user.username,
+        action="investigation.summarized",
+        resource_type="investigation",
+        resource_id=str(investigation.id),
+        detail={"model": summary_model_name},
+    )
+
+    tokens = response.usage.total_tokens if response and response.usage else 0
+
+    return InvestigationSummaryResponse(
+        investigation_id=investigation.id,
+        model=summary_model_name,
+        summary=parsed_summary,
+        markdown=markdown_content,
+        tokens_used=tokens,
+    )
 
 
 async def _append_only_counts(session: AsyncSession, investigation_id: uuid.UUID) -> dict[str, int]:

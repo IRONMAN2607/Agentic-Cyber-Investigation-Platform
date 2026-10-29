@@ -62,9 +62,9 @@ def rate_limit(limiter: SlidingWindowRateLimiter) -> Callable[[Request], None]:
 
     def dependency(request: Request) -> None:
         client_ip = request.client.host if request.client else "unknown"
-        # Check X-Forwarded-For if behind trusted proxy, otherwise socket IP
-        forwarded = request.headers.get("x-forwarded-for")
-        ip = forwarded.split(",")[0].strip() if forwarded else client_ip
-        limiter.check(ip)
+        # Do not trust a client-supplied X-Forwarded-For header. This deployment
+        # is localhost-only and has no configured trusted proxy; accepting that
+        # header would let callers select a new bucket for every request.
+        limiter.check(client_ip)
 
     return dependency

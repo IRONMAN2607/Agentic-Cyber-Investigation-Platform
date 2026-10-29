@@ -160,13 +160,12 @@ async def test_domain_investigation_pipeline(tmp_path: Path) -> None:
         assert ti_data.get("indicator") == domain_target
         assert ti_data.get("is_malicious") is True
         assert ti_data.get("abuse_score") == 88
+        assert ti_data.get("source") == "local_deterministic_feed"
 
         # 3. Verify Threat Intelligence Alert Finding was generated
         findings = list(
             (
-                await session.scalars(
-                    sa.select(Finding).where(Finding.investigation_id == inv_id)
-                )
+                await session.scalars(sa.select(Finding).where(Finding.investigation_id == inv_id))
             ).all()
         )
         assert len(findings) >= 2
@@ -181,9 +180,7 @@ async def test_domain_investigation_pipeline(tmp_path: Path) -> None:
         # 4. Verify canonical entity was resolved in graph
         entities = list(
             (
-                await session.scalars(
-                    sa.select(Entity).where(Entity.investigation_id == inv_id)
-                )
+                await session.scalars(sa.select(Entity).where(Entity.investigation_id == inv_id))
             ).all()
         )
         domain_ent = next(
@@ -194,9 +191,7 @@ async def test_domain_investigation_pipeline(tmp_path: Path) -> None:
 
         # 5. Verify final report
         report = (
-            await session.scalars(
-                sa.select(Report).where(Report.investigation_id == inv_id)
-            )
+            await session.scalars(sa.select(Report).where(Report.investigation_id == inv_id))
         ).first()
         assert report is not None
         assert len(report.content) > 0
@@ -253,17 +248,15 @@ async def test_ip_investigation_pipeline(tmp_path: Path) -> None:
 
         findings = list(
             (
-                await session.scalars(
-                    sa.select(Finding).where(Finding.investigation_id == inv_id)
-                )
+                await session.scalars(sa.select(Finding).where(Finding.investigation_id == inv_id))
             ).all()
         )
-        crit_finding = next(
+        ti_finding = next(
             (f for f in findings if f.detection_rule == "threat_intel.reputation"),
             None,
         )
-        assert crit_finding is not None
-        assert crit_finding.severity == Severity.CRITICAL.value
+        assert ti_finding is not None
+        assert ti_finding.severity == Severity.HIGH.value
 
 
 @pytest.mark.asyncio
@@ -373,9 +366,7 @@ async def test_pcap_investigation_pipeline(tmp_path: Path) -> None:
         # Check PCAP finding recorded
         findings = list(
             (
-                await session.scalars(
-                    sa.select(Finding).where(Finding.investigation_id == inv_id)
-                )
+                await session.scalars(sa.select(Finding).where(Finding.investigation_id == inv_id))
             ).all()
         )
         pcap_finding = next(

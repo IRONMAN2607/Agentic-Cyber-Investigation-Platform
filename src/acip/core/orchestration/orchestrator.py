@@ -416,8 +416,6 @@ class OrchestratorAgent:
                     ),
                 )
             )
-
-
         if self._agents.has("reporting"):
             tasks.append(
                 Task(

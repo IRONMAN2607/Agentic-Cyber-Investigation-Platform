@@ -367,6 +367,18 @@ class ReportAgent(Agent):
         add(f"- **Severity:** {assessment.severity.value.upper()}")
         add(f"- **Risk score:** {assessment.risk_score}/100")
         add(f"- **Confidence:** {assessment.confidence:.2f}")
+        if assessment.deterministic_score is not None and assessment.ai_score is not None:
+            ai_sev_str = assessment.ai_severity.value.upper() if assessment.ai_severity else "INFO"
+            det_sev_str = (
+                assessment.deterministic_severity.value.upper()
+                if assessment.deterministic_severity
+                else "INFO"
+            )
+            add(f"- **AI Decision:** {ai_sev_str} ({assessment.ai_score}/100) — 50% weight")
+            add(
+                f"- **Deterministic Mechanism:** {det_sev_str} "
+                f"({assessment.deterministic_score}/100) — 50% weight"
+            )
         add("")
         add(f"**How this was computed.** {assessment.rationale}")
         add("")

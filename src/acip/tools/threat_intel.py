@@ -1,8 +1,7 @@
-"""Tier 3 Threat Intelligence tool adapter.
+"""Local deterministic threat-intelligence evaluation adapter.
 
-Queries indicator reputation (AbuseIPDB, VirusTotal, and local deterministic threat feed).
-Enforces strict outbound rate limits, per-investigation opt-in, and audit logging.
-Outputs EvidenceDraft objects with EvidenceKind.THREAT_INTEL.
+The bundled entries are synthetic demo data, not third-party reputation results.
+No network requests are made. A missing entry has unknown reputation, not a clean verdict.
 """
 
 from __future__ import annotations
@@ -20,47 +19,61 @@ from acip.types import EntityType, EvidenceKind, SandboxTier, TimeConfidence
 
 logger = get_logger(__name__)
 
-# Known malicious threat intelligence indicators for deterministic offline evaluation
+# Synthetic indicators for deterministic offline evaluation, not live provider results.
 _KNOWN_THREAT_REPUTATION: dict[str, dict[str, Any]] = {
     "198.51.100.23": {
-        "source": "AbuseIPDB",
+        "source": "local_deterministic_feed",
         "abuse_score": 100,
         "is_malicious": True,
+        "reputation_status": "malicious",
         "category": "SSH Brute-Force Attacker",
         "reports_count": 42,
     },
     "203.0.113.195": {
-        "source": "AbuseIPDB",
+        "source": "local_deterministic_feed",
         "abuse_score": 95,
         "is_malicious": True,
+        "reputation_status": "malicious",
         "category": "Web Exploit Scanner / SQLi",
         "reports_count": 28,
     },
     "192.0.2.1": {
-        "source": "ThreatIntel",
+        "source": "local_deterministic_feed",
         "abuse_score": 0,
         "is_malicious": False,
+        "reputation_status": "benign",
         "category": "Documentation / Benign",
         "reports_count": 0,
     },
     "evil-attacker.example.com": {
-        "source": "VirusTotal",
+        "source": "local_deterministic_feed",
         "abuse_score": 88,
         "is_malicious": True,
+        "reputation_status": "malicious",
         "category": "C2 Domain / Phishing",
         "reports_count": 14,
     },
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": {
-        "source": "VirusTotal",
+    "safe.example.com": {
+        "source": "local_deterministic_feed",
         "abuse_score": 0,
         "is_malicious": False,
+        "reputation_status": "benign",
+        "category": "Documentation / Benign",
+        "reports_count": 0,
+    },
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": {  # pragma: allowlist secret  # noqa: E501
+        "source": "local_deterministic_feed",
+        "abuse_score": 0,
+        "is_malicious": False,
+        "reputation_status": "benign",
         "category": "Empty File Hash",
         "reports_count": 0,
     },
-    "44d88612fea8a8f36de82e1278abb02f": {
-        "source": "VirusTotal",
+    "44d88612fea8a8f36de82e1278abb02f": {  # pragma: allowlist secret
+        "source": "local_deterministic_feed",
         "abuse_score": 90,
         "is_malicious": True,
+        "reputation_status": "malicious",
         "category": "EICAR Test String Hash",
         "reports_count": 55,
     },
@@ -72,19 +85,20 @@ class ThreatIntelArgs(BaseModel):
 
     indicator: str = Field(..., description="Target indicator (IP, domain, or hash)")
     indicator_type: str = Field(
-        default="ip", pattern="^(ip|domain|hash)$", description="Type of indicator"
+        default="ip", pattern="^(ip|domain|hash|url)$", description="Type of indicator"
     )
     opt_in_external_lookup: bool = Field(
-        default=True, description="Explicit operator opt-in to query threat intel"
+        default=True,
+        description="Legacy lookup switch; this adapter only queries the local evaluation feed",
     )
 
 
 class ThreatIntelTool(ToolAdapter):
-    """Tier 3 Threat Intelligence tool adapter."""
+    """Local evaluation-feed lookup; no external reputation service is queried."""
 
     name: ClassVar[str] = "threat_intel"
-    version: ClassVar[str] = "0.1.0"
-    tier: ClassVar[SandboxTier] = SandboxTier.T3_NETWORK
+    version: ClassVar[str] = "0.2.0"
+    tier: ClassVar[SandboxTier] = SandboxTier.T0_IN_PROCESS
     args_model: ClassVar[type[BaseModel]] = ThreatIntelArgs
     requires_artifact: ClassVar[bool] = False
 
@@ -94,7 +108,7 @@ class ThreatIntelTool(ToolAdapter):
             version=self.version,
             tier=self.tier,
             available=True,
-            reason="Threat intelligence lookup engine active (deterministic cache + network).",
+            reason="Local deterministic evaluation feed active; no network lookup is performed.",
         )
 
     async def execute(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
@@ -105,7 +119,7 @@ class ThreatIntelTool(ToolAdapter):
             return ToolResult(
                 evidence=[],
                 metrics={"status": "opt_in_declined"},
-                warnings=["Operator did not opt in to external threat intelligence lookups."],
+                warnings=["Operator did not opt in to the local threat-intelligence lookup."],
                 exit_status=0,
             )
 
@@ -113,14 +127,9 @@ class ThreatIntelTool(ToolAdapter):
         rep_info = _KNOWN_THREAT_REPUTATION.get(indicator_val)
 
         if rep_info is None:
-            # Benign or unknown indicator baseline
-            rep_info = {
-                "source": "ThreatCatalog",
-                "abuse_score": 0,
-                "is_malicious": False,
-                "category": "Unknown / Unclassified",
-                "reports_count": 0,
-            }
+            from acip.core.detection.url_rules import inspect_target_reputation
+
+            rep_info = inspect_target_reputation(indicator_val)
 
         observed_time = dt.datetime.now(dt.UTC)
         evidence_item = EvidenceDraft(
@@ -131,6 +140,7 @@ class ThreatIntelTool(ToolAdapter):
                 "source": rep_info["source"],
                 "abuse_score": rep_info["abuse_score"],
                 "is_malicious": rep_info["is_malicious"],
+                "reputation_status": rep_info["reputation_status"],
                 "category": rep_info["category"],
                 "reports_count": rep_info["reports_count"],
                 "query_timestamp": observed_time.isoformat(),
@@ -156,7 +166,11 @@ class ThreatIntelTool(ToolAdapter):
                 "source": rep_info["source"],
                 "abuse_score": rep_info["abuse_score"],
                 "is_malicious": rep_info["is_malicious"],
+                "reputation_status": rep_info["reputation_status"],
             },
-            warnings=[],
+            warnings=[
+                "Synthetic evaluation feed only; scores and report counts are demo values, "
+                "not third-party reputation results."
+            ],
             exit_status=0,
         )

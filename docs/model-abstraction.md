@@ -177,7 +177,7 @@ Experiments report N runs with variance rather than single-shot numbers — see
 - **Quota state is persisted**, so a restart does not re-hammer an exhausted provider.
 - **Cost estimates come from config**, not hard-coded prices, and are labelled estimates.
 
-## 10. Open assumptions — require confirmation before Phase 6
+## 10. Open deployment assumptions
 
 The spec names **"GPT-5.6 Tera"** and **"NVIDIA Nemotron 3 Ultra 550B"** as candidate models (§7).
 
@@ -186,7 +186,7 @@ or whether it supports constrained structured output or tool calling.** Nothing 
 on those answers: models are configuration values (`ACIP_MODEL_REASONING`, `ACIP_MODEL_LONGCTX`,
 `ACIP_MODEL_SMALL`) resolved at runtime, and the code will name no model.
 
-Before Phase 6 the team must confirm, per provider:
+Before enabling a hosted provider in a deployment or experiment, the team must confirm, per provider:
 
 1. Exact model identifiers available under the accounts held.
 2. Whether structured/JSON-schema-constrained output is supported natively — §6's typed-message

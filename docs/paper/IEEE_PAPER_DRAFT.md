@@ -1,7 +1,7 @@
 # Architecturally Enforced Evidence Grounding in Multi-Agent Cyber Investigation Platforms
 
-**Authors:** Angad et al.  
-**Affiliation:** Advanced Agentic Cyber Investigation Platform (ACIP) Project  
+**Authors:** Angad et al.
+**Affiliation:** Advanced Agentic Cyber Investigation Platform (ACIP) Project
 **Target Venue:** IEEE Transactions on Dependable and Secure Computing (TDSC) / IEEE Symposium on Security & Privacy (S&P) Capstone Track
 
 ---

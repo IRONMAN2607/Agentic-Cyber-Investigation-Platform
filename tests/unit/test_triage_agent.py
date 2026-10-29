@@ -220,7 +220,7 @@ async def test_triage_agent_auth_attack_representative_case(
 
         assert len(inference_findings) >= 1
         assert "Authentication Attack" in inference_findings[0].title
-        assert inference_findings[0].severity == Severity.INFO.value
+        assert inference_findings[0].severity == Severity.HIGH.value
         assert "203.0.113.55" in (inference_findings[0].reasoning or "")
 
         assert len(unknown_findings) >= 2

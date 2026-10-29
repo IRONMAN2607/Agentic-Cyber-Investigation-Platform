@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from httpx import AsyncClient
 
 from acip.types import InvestigationStatus, Role, Severity
@@ -25,6 +26,9 @@ CLEAN_WEB_FIXTURE = "\n".join(
         "",
     ]
 )
+
+
+pytestmark = pytest.mark.parametrize("settings", [False, True], indirect=True)
 
 
 async def test_web_log_attack_scenario(

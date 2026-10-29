@@ -169,7 +169,10 @@ def validate_url_ssrf_safe(url: str, *, resolve_dns: bool = True) -> tuple[str, 
     except ValueError:
         # Case 2: Hostname is a domain, perform DNS resolution
         if resolve_dns:
-            port = parsed.port or (443 if scheme == "https" else 80)
+            try:
+                port = parsed.port or (443 if scheme == "https" else 80)
+            except ValueError as exc:
+                raise ValidationError(f"invalid URL port: {exc}") from exc
             try:
                 addr_info = socket.getaddrinfo(
                     hostname, port, family=socket.AF_UNSPEC, proto=socket.IPPROTO_TCP

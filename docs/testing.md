@@ -1,12 +1,13 @@
 # Testing Architecture
 
-**Current state: 97 tests passing.** The full test suite covers `unit/`, `integration/`, `api/`, `security/`, and `scenarios/`, verifying grounding invariants G0–G4, append-only immutability, provenance integrity, recovery semantics, Alembic upgrades, and the complete M1 vertical slice.
+**Current state: 222 tests passing.** The full test suite covers `unit/`, `integration/`, `api/`,
+`security/`, `scenarios/`, and `evaluation/`, verifying grounding invariants G0–G4, append-only
+immutability, provenance integrity, recovery semantics, Alembic upgrades, the adaptive pipeline,
+and the complete supported vertical slice.
 
 That is stated first because §1 is the project's governing rule: never claim something works without
-having verified it. That cuts both ways: the suite below is real and was run, and the gaps in
-[roadmap.md](roadmap.md) §3.1 are real too. Four Phase 1′ criteria remain open — an atomic start
-claim, a backup/restore integrity check, retention disclosure in the report, and the operating
-boundary in the capability output — and no document here should be read as covering them.
+having verified it. The suite below is real and was run. Phase 1′ criteria are covered by tests for
+the atomic start claim, backup/restore integrity, retention disclosure, and operating-boundary output.
 
 ## 1. What the fixtures already commit us to
 
@@ -196,9 +197,8 @@ pytest
 `asyncio_mode = "auto"` is set, so `async def` tests need no decorator. Markers: `unit`,
 `integration`, `api`, `security`, `scenario`, `slow`. Everything except `slow` runs on every commit.
 
-CI (Phase 1′, GitHub Actions): `ruff check`, `ruff format --check`, `mypy src`, `pytest`, and
-`pip-audit`. All four gate a merge. The 18 ruff and 11 mypy findings currently outstanding must be
-cleared before CI is switched on, otherwise the first red build teaches the team to bypass it.
+CI (GitHub Actions): `ruff check`, `ruff format --check`, `mypy src`, `pytest`, lockfile
+consistency, and `pip-audit`. These gates are configured to run on pushes and pull requests.
 
 ## 7. Definition of done (§38)
 

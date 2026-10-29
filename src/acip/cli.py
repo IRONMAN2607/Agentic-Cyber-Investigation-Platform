@@ -23,6 +23,8 @@ from acip.core.security.passwords import MIN_PASSWORD_LENGTH, hash_password
 from acip.db.migrate import upgrade_to_head
 from acip.db.models import User
 from acip.db.session import Database
+from acip.demo import seed_demo_investigations
+from acip.errors import ConfigurationError
 from acip.logging import configure_logging, get_logger
 from acip.tools.registry import build_default_registry as build_tool_registry
 from acip.types import Role
@@ -52,6 +54,16 @@ def build_parser() -> argparse.ArgumentParser:
     create_user.add_argument("--email", default=None)
 
     sub.add_parser("capabilities", help="print what this deployment can actually do")
+
+    seed_samples = sub.add_parser(
+        "seed-samples",
+        help="create the 16 synthetic high- and low-risk investigations for every target type",
+    )
+    seed_samples.add_argument(
+        "--no-run",
+        action="store_true",
+        help="create the sample rows and artifacts without executing investigations",
+    )
 
     backup = sub.add_parser("backup", help="create a verified database and artifact backup")
     backup.add_argument("destination", type=Path)
@@ -88,6 +100,8 @@ def main(argv: list[str] | None = None) -> int:
             return asyncio.run(_create_user(settings, args.username, args.role, args.email))
         case "capabilities":
             _capabilities(settings)
+        case "seed-samples":
+            return asyncio.run(_seed_samples(settings, execute=not args.no_run))
         case "backup":
             _backup(settings, args.destination)
         case "restore":
@@ -106,6 +120,39 @@ async def _init(settings: Settings) -> None:
         print(f"Storage ready. Artifacts: {settings.artifact_dir}")
     finally:
         await database.dispose()
+
+
+async def _seed_samples(settings: Settings, *, execute: bool) -> int:
+    """Seed and optionally execute the complete local demonstration catalog."""
+    database = Database(settings.database_url, echo=settings.db_echo)
+    try:
+        await bootstrap(database, settings)
+        results = await seed_demo_investigations(database, settings, execute=execute)
+    except ConfigurationError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    finally:
+        await database.dispose()
+
+    action = "seeded and evaluated" if execute else "prepared"
+    new_count = sum(1 for result in results if result.created)
+    print(f"Demo investigations {action}: {len(results)} ({new_count} new)")
+    for result in results:
+        if execute:
+            evaluation = "PASS" if result.evaluation_passed else "CHECK"
+            risk = f"{result.risk_score}/100" if result.risk_score is not None else "n/a"
+            severity = result.severity or "n/a"
+            print(
+                f"{evaluation:5} {result.sample.risk_band:4} {result.sample.target_type.value:11} "
+                f"{severity:8} risk={risk:>7} {result.sample.title} "
+                f"({result.investigation_id})"
+            )
+        else:
+            print(
+                f"READY {result.sample.risk_band:4} {result.sample.target_type.value:11} "
+                f"{result.sample.title} ({result.investigation_id})"
+            )
+    return 0
 
 
 async def _create_user(settings: Settings, username: str, role: str, email: str | None) -> int:

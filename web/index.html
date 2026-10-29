@@ -182,9 +182,28 @@
     </div>
   </dialog>
 
+  <!-- Native HTML Dialog: AI Executive Layman Summary -->
+  <dialog id="modal-ai-summary" style="max-width: 780px; width: 92%;">
+    <div class="dialog-header">
+      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <span class="ai-sparkle-icon">✨</span>
+        <h3 class="dialog-title" style="margin: 0;">AI Executive Summary</h3>
+        <span class="ai-badge-nemotron">NVIDIA Nemotron 3 Ultra 550B</span>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('modal-ai-summary').close()">✕</button>
+    </div>
+    <div id="ai-summary-content" style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.9rem; max-height: 72vh; overflow-y: auto;">
+      <!-- Content populated dynamically -->
+    </div>
+    <div class="dialog-actions" style="margin-top: 1.25rem;">
+      <button id="btn-copy-ai-summary" type="button" class="btn btn-outline btn-sm" onclick="window.acipCopyAISummary()">📋 Copy Markdown Summary</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('modal-ai-summary').close()">Close</button>
+    </div>
+  </dialog>
+
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-  <script src="app.js?v=2.5"></script>
+  <script src="app.js?v=2.6"></script>
 </body>
 </html>

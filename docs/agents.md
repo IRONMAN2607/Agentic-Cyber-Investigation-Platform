@@ -155,9 +155,15 @@ investigation or silently skipping work.
 | `triage` | `TRIAGE` | Classifies the submission, extracts IOCs, inventories entities, estimates initial severity, proposes task plan |
 | `log_analysis` | `LOG_ANALYSIS` | Runs `auth_log_parser`, applies deterministic detection rules, records auth findings |
 | `reporting` | `REPORTING` | Renders the report from stored records; computes the risk roll-up |
+| `mitre` | `MITRE_MAPPING` | Maps deterministic detection rules to the verified local ATT&CK catalog |
+| `correlation` | `CORRELATION` | Resolves entities and builds evidence-backed graph edges |
+| `reasoning` | `REASONING` | Finds suspicious multi-hop paths over the evidence graph |
+| `hypothesis` | `HYPOTHESIS` | Generates competing explanations with refutation conditions and gaps |
+| `validation` | `VALIDATION` | Adversarially evaluates hypotheses with bounded execution |
 
-The reporting agent's narrative is **template-produced from stored records** — no language model is
-involved anywhere in the current build. `core/limitations.py` states this in the report itself.
+The reporting agent's narrative is **template-produced from stored records**. Optional model use is
+behind the model router for triage classification and adaptive planning; it cannot write evidence or
+an unsupported `FACT`. `core/limitations.py` states the active mode in the report itself.
 
 ### Planned
 
@@ -166,19 +172,15 @@ involved anywhere in the current build. `core/limitations.py` states this in the
 | `network_analysis` | 4 | PCAP via Zeek/TShark/Suricata |
 | `endpoint_analysis` | 4 | Processes, persistence, registry, YARA; never executes samples |
 | `threat_intelligence` | 4 | Reputation lookups; T3 tools; records source/query/timestamp |
-| `mitre` | 4 | Maps behaviour to tactics/techniques; validated against the local catalog |
-| `correlation` | 5 | Entity resolution, evidence graph construction, timeline |
-| `hypothesis` | 7 | Generates competing explanations; must state refutation conditions |
-| `reasoning` | 7 | Cross-source attack-chain reasoning |
-| `validation` | 7 | Challenges conclusions; can return the investigation to the orchestrator |
 | `risk` | 7 | Deterministic score + attributed LLM opinion, never overwriting the score |
 | `investigator_chat` | 8 | Answers questions from structured investigation data only |
 
-Everything in this roster through Phase 5 is deterministic. The first agent to use a language model
-arrives in Phase 6, after the model abstraction layer exists — see [roadmap.md](roadmap.md) §0.
+The core detection, graph, hypothesis, validation, and reporting paths are deterministic. Optional
+model use enters through the Phase 6 abstraction layer for triage and adaptive planning; agents never
+import a provider SDK directly.
 
-The MITRE agent must never emit a technique id absent from the loaded catalog — planned invariant G7
-in [evidence-model.md](evidence-model.md). §5.7: never hallucinate ATT&CK IDs.
+The MITRE agent must never emit a technique id absent from the loaded catalog — invariant G7 in
+[evidence-model.md](evidence-model.md). §5.7: never hallucinate ATT&CK IDs.
 
 The validation agent is the one component permitted to send an investigation backwards. Its
 re-entry path is bounded by the same task cap and wall-clock budget, and loop detection (§29) caps

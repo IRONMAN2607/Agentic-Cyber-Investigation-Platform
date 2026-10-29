@@ -106,19 +106,21 @@ Re-starting a non-`created` investigation is a `409`, not an idempotent no-op �
 would hide a client bug and could double-run tools. For re-running failed or halted work, use
 `POST /investigations/{id}/retry`.
 
-### Planned
+### Implemented extensions
 
 | Phase | Endpoints |
 |---|---|
 | 5 | `/investigations/{id}/graph`, `/entities`, `/timeline`, `/findings/{id}/subgraph` |
-| 6 | `/investigations/{id}/hypotheses` |
-| 8 | `/investigations/{id}/chat`, `/investigations/{id}/events` (SSE), `/report/export` |
-| 8 | `/investigations/{id}/attack` (ATT&CK matrix view) |
+| 7 | `/investigations/{id}/hypotheses` and validation data in investigation detail |
+| 8 | `/investigations/{id}/events` (SSE) and the served web workspace |
+
+Investigator chat, report export, and a dedicated ATT&CK matrix endpoint remain unavailable; the
+capability response and limitations list are the source of truth for those gaps.
 
 ## 5. Progress reporting
 
-Polling `GET /investigations/{id}` is the M1 mechanism. Phase 8 adds **server-sent events** for live
-agent activity.
+Polling `GET /investigations/{id}` remains available, and the current build also exposes
+**server-sent events** for persisted live agent activity.
 
 SSE rather than WebSockets: the stream is one-directional (server → UI), SSE reconnects automatically,
 and it needs no protocol upgrade path through a proxy. There is no bidirectional requirement —
@@ -130,9 +132,9 @@ by persisted rows, so a stalled agent looks stalled.
 
 ## 6. Conventions
 
-- **Pagination** — use stable cursor pagination for investigation records, evidence, entities,
-  timeline, audit, and run history. Each endpoint specifies a bounded `limit` (≤500) and an opaque
-  cursor derived from a deterministic sort key; offset pagination is not part of the public contract.
+- **Pagination** — evidence uses stable cursor pagination. The investigation list currently uses a
+  bounded `limit` plus `offset`; entity, timeline, audit, and run-history responses are bounded by
+  their endpoint implementations. Cursor pagination is the target contract for a future shared deployment.
 - **Timestamps** — ISO 8601 UTC with offset, always.
 - **Ids** — UUIDs in payloads; `INV-`/`EVD-`/`FND-` display forms are additional fields, never
   substitutes.

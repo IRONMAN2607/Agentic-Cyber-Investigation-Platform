@@ -70,7 +70,7 @@ and will not pretend to.
 | Path traversal via filename | **mitigated** — `sanitize_filename()`, content-addressed storage, post-resolution containment assertion |
 | Disk exhaustion | **mitigated per-file** — cap enforced mid-stream; no per-user rate limit |
 | Malicious archive (zip bomb, traversal in entries) | **not mitigated** — no archive handling yet; when added, entry paths and expansion ratio must both be bounded |
-| Parser exploitation (malformed PCAP/EVTX) | **not mitigated** — Phase 4 parsers run in-process today; this is the reason T2 containers gate that phase |
+| Parser exploitation (malformed PCAP/EVTX) | **partially mitigated** — the bounded PCAP parser handles bytes in-process; no EVTX parser or container isolation is available |
 | ReDoS via crafted log line | **partially** — rule review only; per-tool timeout is Phase 4 |
 | Sample execution | **not applicable yet** — no tool executes files; **also not prevented** if one were added carelessly |
 | Sample escaping into the host | **not mitigated** — no sandbox exists |
@@ -88,8 +88,8 @@ per tool class in advance.
 | Audit log altered | **mitigated** — same mechanism |
 | Fabricated `FACT` from model output | **mitigated structurally** — G1 requires a `tool_run_id`, which only the tool runner sets |
 | Unfalsifiable hypothesis | **mitigated** — G3 requires a refutation condition; `NOT NULL` at schema level in Phase 7 |
-| Hallucinated ATT&CK technique | **designed** — planned G7 validates against the loaded catalog with a recorded `catalog_version` |
-| Graph edge without evidence | **designed** — `entity_edges.evidence_id` is `NOT NULL` |
+| Hallucinated ATT&CK technique | **mitigated** — the MITRE agent maps only to the loaded catalog and records its `catalog_version` |
+| Graph edge without evidence | **mitigated** — `entity_edges.evidence_id` is `NOT NULL` and graph tests cover evidence-backed edges |
 | Prompt injection from evidence content | **contained, not prevented** — see below |
 | Deduplication abuse | **partially** — content hash covers intrinsic content only, so identical observations collapse by design; a crafted near-duplicate flood is bounded only by upload limits |
 
@@ -120,7 +120,7 @@ misleading a human or attacking their browser — hence text-only rendering
 | Threat | Status |
 |---|---|
 | SQL injection | **mitigated** — parameterised throughout; Phase 5 CTEs use bound parameters |
-| Credential stuffing / brute force | **not mitigated** — no throttling, no lockout ([security.md](security.md) §9) |
+| Credential stuffing / brute force | **partially mitigated** — localhost single-process login rate limit; no distributed limiter or account lockout |
 | Token theft | **partially** — short TTL; no revocation, so a stolen token is valid until expiry |
 | `alg: none` / algorithm confusion | **mitigated** — explicit `algorithms=["HS256"]`, required claims |
 | Horizontal privilege escalation | **not mitigated** — no object-level ACL. A1's most likely win via A3 |
@@ -134,11 +134,11 @@ misleading a human or attacking their browser — hence text-only rendering
 
 | Threat | Status |
 |---|---|
-| SSRF to internal services | **designed, not implemented** — resolve-then-validate-then-connect |
-| Cloud metadata access | **designed** — `169.254.169.254` and IPv6 equivalents rejected |
-| DNS rebinding | **designed** — connect to the validated IP, `Host` header set |
-| Redirect to internal address | **designed** — no automatic redirect following; re-validate every hop |
-| Investigation disclosure to intel providers | **designed** — T3 requires per-investigation opt-in; every lookup recorded |
+| SSRF to internal services | **mitigated** — resolve-then-validate-then-connect with pinned IP transport |
+| Cloud metadata access | **mitigated** — metadata, private, link-local, and mapped IPv4 ranges are rejected |
+| DNS rebinding | **mitigated** — connect to the validated IP while retaining the original host for TLS/HTTP |
+| Redirect to internal address | **mitigated** — redirects are disabled in the client and re-validated hop by hop |
+| Investigation disclosure to intel providers | **not applicable to current feed** — the registered threat-intelligence tool is local-only; external providers are not integrated |
 | Attacker learns they are investigated | **accepted risk** — inherent to using third-party intel; mitigated only by making the opt-in explicit and logged |
 
 ### 3.5 Secrets and supply chain
@@ -147,8 +147,8 @@ misleading a human or attacking their browser — hence text-only rendering
 |---|---|
 | Secret committed to git | **partially** — `.env` gitignored, `.env.example` empty; pre-commit scan is Phase 1′ |
 | Weak production secret | **mitigated** — startup fails if `secret_key` < 32 chars in production |
-| Key leaked via logs or `tool_runs.args` | **designed** — adapters record queries, never credentials |
-| Malicious dependency | **partially** — pinned versions; `pip-audit` in CI is Phase 1′. A4 remains largely unmitigated |
+| Key leaked via logs or `tool_runs.args` | **partial** — the current local feed has no provider key; future adapters must preserve the credential-separation contract |
+| Malicious dependency | **mitigated in the current lock** — pinned dependencies and a passing `pip-audit --strict` gate; supply-chain compromise remains outside application controls |
 | Artifact store readable by other local processes | **unmitigated on Windows** — `0o600` is a POSIX no-op; the current dev host is Windows |
 
 ## 4. Where we would lose
@@ -164,7 +164,7 @@ Stated plainly, because a threat model that concludes "adequately mitigated" is 
    not mean it is *caught at the time*.
 4. **A compromised dependency.** Full application privilege, and application-level defences do not
    apply.
-5. **A public deployment, today.** No rate limiting, no TLS termination in-platform, no revocation.
+5. **A public deployment, today.** No object-level ACL, TLS termination in-platform, token revocation, or distributed limiter.
 
 Items 1, 2, and 5 have designs and phase assignments. Items 3 and 4 are accepted risks with stated
 reasoning.

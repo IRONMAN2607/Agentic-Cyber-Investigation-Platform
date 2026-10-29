@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     model_secondary: str = "openai/gpt-oss-20b"
     model_nemotron: str = "meta/llama-3.2-11b-vision-instruct"
     model_deepseek: str = "openai/gpt-oss-20b"
+    model_nemotron_summary: str = "nvidia/nemotron-3-ultra-550b"
     llm_request_timeout_seconds: float = Field(default=60.0, ge=1.0)
     llm_max_investigation_tokens: int = Field(default=200_000, ge=1_000)
     llm_schema_retries: int = Field(default=2, ge=0, le=5)

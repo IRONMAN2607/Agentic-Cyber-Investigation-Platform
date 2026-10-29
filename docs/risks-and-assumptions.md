@@ -44,18 +44,19 @@ write down what is actually there.
 
 Ranked by expected damage — probability × consequence — not by how uncomfortable they are to state.
 
-### R1 — Six thousand lines of unverified code · **likelihood: certain · impact: high**
+### R1 — Regression risk in a large security-sensitive codebase · **likelihood: medium · impact: high**
 
-Phases 1–3 exist with zero executed tests and a vertical slice that has never run. The database has
-never been created. There are certainly defects; their number and location are unknown.
+The current implementation has 222 passing tests and a verified vertical slice, but the codebase
+handles hostile artifacts, authentication, provenance, and model output. A regression in one of
+those boundaries can still corrupt an investigation or its evaluation metrics.
 
-*Why it ranks first:* every later phase inherits it, and the evaluation converts undetected defects
-into published numbers. A grounding-invariant bug would corrupt the primary metric while looking
-entirely healthy.
+*Why it remains important:* every later phase inherits it, and the evaluation converts undetected
+defects into published numbers. A grounding-invariant bug would corrupt the primary metric while
+looking entirely healthy.
 
-*Mitigation:* Phase 1′ before anything else, with an explicit exit gate including "the slice actually
-executed, observed". *Trigger for escalation:* if Phase 1′ exceeds three weeks, the code is worse than
-assumed and a partial rewrite of the affected module becomes the cheaper option.
+*Mitigation:* keep the invariant, API, scenario, and security suites green; run the reproduction
+runner before citing evaluation numbers. *Trigger for escalation:* a failed security or provenance
+test blocks release until the affected module and its regression test are corrected.
 
 ### R2 — Scope · **likelihood: high · impact: high**
 
@@ -169,7 +170,8 @@ matrix in one window rather than accumulating results across months.
 
 Sixteen design documents now describe a system whose code does not yet match them in several places.
 Documents that describe intentions as if they were controls are how a project starts lying to itself —
-and this suite is deliberately full of "not implemented" markers that must be removed as features land.
+and this suite deliberately records the remaining deployment boundary rather than treating future
+features as available.
 
 *Mitigation:* `core/limitations.py` and `/capabilities` are machine-readable status, tested against
 reality ([testing.md](testing.md) §2 `api/`). §38's definition of done includes updating docs in the
@@ -188,7 +190,7 @@ open. Each is defensible; none should be discovered later as a surprise.
 | **D4** | **Reject Neo4j**; relational graph in PostgreSQL | §10 required the evaluation, not the outcome | Shallow queries at 10²–10⁴ nodes; `entity_edges.evidence_id` cannot be a foreign key across datastores; reversible ([evidence-graph.md](evidence-graph.md)) |
 | **D5** | Custom asyncio orchestration, no Celery/Temporal/LangGraph | — | The execution trace *is* the research dataset and must be first-class, not a framework's internal state ([architecture.md](architecture.md)) |
 | **D6** | Phase 6 = model abstraction, Phase 7 = reasoning agents | Earlier drafts of these docs | The reasoning agents depend on the model layer; the original order was a dependency error ([roadmap.md](roadmap.md) §0) |
-| **D7** | No language model anywhere before Phase 6 | — | Makes Baseline A the actual Phase 5 system rather than a reimplementation |
+| **D7** | Model use remains behind the Phase 6 abstraction | — | Keeps Baseline A deterministic while optional triage/planning model calls use one auditable interface |
 | **D8** | Confidence lives on findings, not on agent messages | §6's envelope | One number per run averages claims of different strength and cannot be audited |
 | **D9** | `EVENT` is not a graph node type | §10's node list | Events are evidence rows; promoting them duplicates the evidence table |
 | **D10** | Grounding violations raise, never downgrade | — | A silent downgrade is unobservable; the raise is the research metric |
@@ -202,20 +204,20 @@ Concrete, countable, and all assigned to Phase 1′ unless noted:
 
 | Item | Detail |
 |---|---|
-| Tests | 97 passing across unit, integration, API, security, and scenario layers |
+| Tests | 222 passing across unit, integration, API, security, scenario, and evaluation layers |
 | Vertical slice | Executed by `tests/scenarios/test_auth_log_scenario.py` |
 | Lint | `ruff check src tests` clean |
 | Types | `mypy src` clean |
 | Migrations | Alembic upgrade-to-head only; fixture and drift coverage included |
 | CI | GitHub Actions gates lint, format, types, tests, and dependency audit on pushes and pull requests |
 | Secret scanning | `detect-secrets` pre-commit hook with repository baseline |
-| `findings.evidence_ids` | JSON array rather than a join table; blocks CONTRADICTS and G6 until Phase 5 |
+| `findings.evidence_ids` | Legacy JSON citations are retained for compatibility; `finding_evidence` is populated by graph correlation |
 | Phase references in `src/` | Several docstrings cite phase numbers predating [roadmap.md](roadmap.md) |
 | Rate limiting | Login and sensitive investigation routes limited in the current single-process deployment |
 | Object-level authz | Absent (before multi-team use) |
 | Token revocation / refresh | Absent |
-| Model abstraction | Absent (Phase 6) |
-| Frontend | Absent (Phase 8) |
+| Model abstraction | Implemented; hosted-provider identifiers and data-handling terms remain deployment assumptions |
+| Frontend | Implemented as the served workspace in `web/` |
 
 ## 5. What would make this project fail
 

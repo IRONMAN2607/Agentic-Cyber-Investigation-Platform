@@ -13,8 +13,12 @@ def get_not_implemented(settings: Any = None) -> list[str]:
     """Return declared capability limitations reflecting the active runtime configuration."""
     items: list[str] = [
         "No endpoint or memory forensics: process, registry and memory artifacts are not examined.",
-        "No hypothesis generation or validation: competing explanations are not enumerated "
-        "or tested against evidence (scheduled for Phase 7).",
+        "No dynamic malware or sample execution: the deployment does not detonate files or "
+        "provide a VM/container escape boundary for live samples.",
+        "Threat intelligence uses only the bundled deterministic evaluation feed; no external "
+        "VirusTotal, AbuseIPDB, OTX, Shodan, DNS, or RDAP provider is contacted.",
+        "Object-level authorization is not implemented; the supported boundary is one trusted "
+        "developer on localhost rather than a shared multi-user deployment.",
     ]
     if settings is not None and getattr(settings, "enable_llm_triage", False):
         items.append(
@@ -28,13 +32,19 @@ def get_not_implemented(settings: Any = None) -> list[str]:
         )
     items.append(
         "Parsing covers Linux authentication logs (sshd/sudo/PAM), Web server access logs "
-        "(Nginx/Apache/W3C), and PCAP packet captures."
+        "(Nginx/Apache/W3C), PCAP packet captures, and URL/domain indicator inspection "
+        "(brand typosquatting, deceptive subdomains, and credential phishing lures)."
     )
     items.append(
-        "Deterministic MITRE ATT&CK mapping is active for authentication and web attack rules."
+        "Deterministic MITRE ATT&CK mapping is active for authentication, web attack, "
+        "and URL/domain phishing detection rules."
     )
     items.append(
         "Deterministic evidence graph correlation and canonical entity resolution are active."
+    )
+    items.append(
+        "Hypothesis generation and bounded validation are available to the adaptive planner; "
+        "the execution trace records whether they ran for a particular investigation."
     )
     return items
 

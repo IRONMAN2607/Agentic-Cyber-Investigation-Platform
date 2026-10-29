@@ -27,7 +27,7 @@ path rather than reimplemented as a comparison artefact.
 | 2 | Evidence store, grounding invariants, tool layer, artifact intake | **verified** |
 | 3 | Agents, planner, orchestrator, runner, reporting | **verified** |
 | **1′** | **Verification retrofit** | **complete** — all 15 exit criteria met and verified; see §3 |
-| 4 | Tool and knowledge expansion; sandboxing; hardening | **verified**; T1 sandbox, Web log parser, PCAP parser, Threat Intel, MITRE agent (G7) |
+| 4 | Tool and knowledge expansion; sandboxing; hardening | **verified**; bounded artifact intake/SSRF, auth/web/PCAP parsers, local feed, MITRE agent (G7), and subprocess helper |
 | 5 | Evidence graph, correlation, PostgreSQL | **verified**; Entity resolution, GraphTraversalEngine, relational schema & indexes |
 | 6 | Model abstraction and routing | **verified**; provider protocol, routing policy, fallback, telemetry, token ceiling |
 | 7 | Reasoning agents | **verified**; HypothesisAgent (G3), ValidationAgent (bounded loops), ReasoningAgent, AdaptivePlanner |
@@ -38,7 +38,7 @@ path rather than reimplemented as a comparison artefact.
 **"Verified" means a live command result, not a claim inferred from source.** Verified figures:
 
 ```text
-pytest                                  215 passed
+ pytest                                  222 passed
 reproduce_results.py                    REPRODUCIBILITY RUN COMPLETED (0 fabrications, 0.0 FPR, 1.0 provenance)
 ruff check src experiments tests scripts All checks passed!
 ruff format --check                     160 files already formatted
@@ -51,7 +51,8 @@ negative baseline beside it. Every fixture creates its schema by upgrading Alemb
 tests assert both the revision stamp and model/migration parity, including a real populated-database
 upgrade test from `0002` to `0003` proving data and restrictive provenance FKs survive table rebuilds.
 
-Remaining Phase 4 tool expansion and sandboxing tasks (subprocess isolation, container sandboxing, external network tools, ATT&CK mapping) remain the active implementation focus.
+Phase 4's registered tools are deterministic and local. Container isolation, external network
+providers, and live malware handling remain deployment gaps rather than active product capabilities.
 
 **Earlier revisions of this section claimed the opposite** — "zero tests run against them", "the
 development database has never been created" — and that text survived long after it stopped being
@@ -76,12 +77,11 @@ multiple intelligence providers, routing failover, investigator chat, analyst st
 PCAP tooling, and a rich frontend are deferred unless a written experiment need demonstrates they are
 necessary.
 
-**Inactive Domain Code Classification:** Models and schema tables prebuilt for future milestones
-(`finding_evidence` for Phase 5 graph correlation, `llm_calls` / `ModelExecution` for Phase 6 model
-abstraction, and `hypotheses` / `hypothesis_evidence` / `hypothesis_gaps` for Phase 7 reasoning agents)
-are classified strictly as **schema scaffolding**. Their presence in the database schema and store methods
-does not constitute feature implementation or milestone completion until the corresponding agents,
-planners, and API paths are delivered in those phases.
+The domain tables are active implementation, not completion claims by themselves: `finding_evidence`
+is populated during graph correlation, `llm_calls` records model-router executions, and
+`hypotheses`/`hypothesis_evidence`/`hypothesis_gaps` are written by the reasoning agents. The
+capability endpoint and execution trace remain authoritative for whether a specific deployment ran
+those paths.
 
 No phase starts merely because its predecessor is numbered complete: its exit criteria must be met and
 the supported deployment boundary must still hold. With all Phase 1′ exit criteria met, Phase 4 is unblocked.
@@ -124,7 +124,7 @@ present.
 
 | # | Criterion | State | Evidence, or what is missing |
 |---|---|---|---|
-| 1 | pytest across the four layers | met | 110 passed; `unit/ integration/ api/ security/` plus `scenarios/` |
+ | 1 | pytest across the test layers | met | 222 passed; `unit/ integration/ api/ security/ scenarios/ evaluation/` |
 | 2 | Vertical slice executes | met | `tests/scenarios/test_auth_log_scenario.py`, plus a clean-log baseline |
 | 3 | G0–G4 each raise `GroundingError` | met | `integration/test_grounding.py` asserting G0–G4 invariant enforcement |
 | 4 | Append-only tested for `evidence`, `audit_log` | met | row-level and bulk-DML cases for both, plus the sanctioned purge |
@@ -142,7 +142,11 @@ present.
 
 All 15 exit criteria are verified. Phase 1′ is exited and Phase 4 is unblocked.
 
-Subsequent milestones have delivered Phase 4 safe artifact intake & SSRF protection, deterministic Web Server Access Log Parser (`web_server_log_parser`) and attack detection engine, Phase 6 model abstraction (provider protocol, routing policy, fallback chains, telemetry, token budgeting, and local cyber reasoning engine), and end-to-end integration across frontend, orchestrator, triage agent, and evidence store, bringing the test suite to 185 passing tests. Remaining Phase 4 tool and sandboxing tasks (subprocess isolation, container sandboxing, external network tools, ATT&CK mapping) form the active focus.
+Subsequent milestones delivered safe artifact intake and SSRF protection, deterministic auth/web/PCAP
+parsers and attack detection, the model abstraction and local reasoning provider, graph correlation,
+reasoning agents, the frontend, and the evaluation/reproduction harness. The remaining work is
+deployment hardening: container isolation, external network-provider adapters, object-level ACLs,
+distributed limits, and token revocation.
 
 ## 4. Phases 4–10
 

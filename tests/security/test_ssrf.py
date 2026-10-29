@@ -100,6 +100,11 @@ def test_validate_url_ssrf_literal_forbidden_ips() -> None:
         validate_url_ssrf_safe("http://192.168.1.100/config", resolve_dns=False)
 
 
+def test_validate_url_ssrf_rejects_malformed_port() -> None:
+    with pytest.raises(ValidationError, match="invalid URL port"):
+        validate_url_ssrf_safe("http://example.com:not-a-port/path", resolve_dns=True)
+
+
 def test_validate_url_ssrf_dns_resolution_blocking() -> None:
     # Mock DNS resolving to internal IP
     with patch("socket.getaddrinfo") as mock_gai:

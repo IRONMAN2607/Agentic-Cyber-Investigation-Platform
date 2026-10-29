@@ -134,3 +134,35 @@ async def test_cyber_reasoning_probe() -> None:
     avail = await provider.probe()
     assert avail.available is True
     assert len(avail.models) > 0
+
+
+@pytest.mark.asyncio
+async def test_cyber_reasoning_layman_summary() -> None:
+    from acip.api.schemas import LaymanSummary
+
+    provider = CyberReasoningProvider(name="test_reasoning")
+
+    prompt = (
+        "Investigation Title: Web Server Exploit Investigation\n"
+        "Target Type: log\n"
+        "Target Value: access.log\n"
+        "Status: completed\n"
+        "Severity: high\n"
+        "Blended Risk Score: 78 / 100\n\n"
+        "Grounded Findings:\n"
+        "- [CRITICAL] SQL Injection Detected: Attack patterns observed\n\n"
+        "Generate a clear, objective executive summary in layman terms using "
+        "NVIDIA Nemotron 3 Ultra 550B. Explain what happened chronologically."
+    )
+
+    request = LLMRequest(messages=[ChatMessage(role=MessageRole.USER, content=prompt)])
+    response = await provider.complete(request, model="nvidia/nemotron-3-ultra-550b")
+
+    assert response.raw_response is not None
+    assert response.raw_response.get("schema") == "LaymanSummary"
+    summary = LaymanSummary.model_validate_json(response.content)
+    assert len(summary.headline) > 5
+    assert len(summary.what_happened) > 10
+    assert len(summary.key_findings) >= 1
+    assert len(summary.conclusion) > 10
+    assert len(summary.recommended_actions) >= 1

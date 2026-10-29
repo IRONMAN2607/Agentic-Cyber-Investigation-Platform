@@ -35,6 +35,28 @@ DEFAULT_TRIAGE_RESPONSE = json.dumps(
     }
 )
 
+DEFAULT_SUMMARY_RESPONSE = json.dumps(
+    {
+        "headline": "Suspicious Activity Investigation Completed",
+        "what_happened": (
+            "The automated security platform investigated the specified target and associated "
+            "telemetry to determine whether unauthorized access or malicious behavior occurred."
+        ),
+        "key_findings": [
+            "Authentication and network event logs were inspected for security violations.",
+            "Heuristic and correlation rules evaluated potential indicators of compromise.",
+        ],
+        "conclusion": (
+            "The evaluation concluded with full evidence traceability. Based on verified "
+            "observations, no uncontained breach was detected."
+        ),
+        "recommended_actions": [
+            "Continue standard monitoring of network perimeters.",
+            "Verify endpoint software versions and patch levels are current.",
+        ],
+    }
+)
+
 
 class ReplayProvider:
     """Test double that returns deterministic pre-configured responses or simulated errors."""
@@ -92,4 +114,4 @@ class ReplayProvider:
         )
 
 
-__all__ = ["ReplayProvider"]
+__all__ = ["DEFAULT_SUMMARY_RESPONSE", "DEFAULT_TRIAGE_RESPONSE", "ReplayProvider"]

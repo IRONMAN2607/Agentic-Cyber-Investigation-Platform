@@ -106,6 +106,24 @@ async def test_investigation_crud_and_lifecycle(
     assert "# Investigation Report" in report_data["content"]
     assert "203.0.113.55" in report_data["content"]
 
+    # 8b. Generate AI Layman Summary (NVIDIA Nemotron 3 Ultra 550B)
+    resp_summary = await client.post(
+        f"/api/v1/investigations/{inv_id}/summarize",
+        headers=auth_headers[Role.VIEWER],
+    )
+    assert resp_summary.status_code == 200
+    summary_data = resp_summary.json()
+    assert summary_data["investigation_id"] == inv_id
+    assert summary_data["model"] == "nvidia/nemotron-3-ultra-550b"
+    assert "summary" in summary_data
+    assert "headline" in summary_data["summary"]
+    assert "what_happened" in summary_data["summary"]
+    assert "conclusion" in summary_data["summary"]
+    assert len(summary_data["summary"]["key_findings"]) >= 1
+    assert "markdown" in summary_data
+    assert "# Executive Incident Summary" in summary_data["markdown"]
+    assert "nvidia/nemotron-3-ultra-550b" in summary_data["markdown"]
+
     # 9. Hypotheses endpoint & detail check
     assert "hypotheses" in detail
     resp_hyp = await client.get(
@@ -150,18 +168,34 @@ async def test_investigation_creation_all_target_types(
         ("domain", "evil-attacker.example.com", "evil-attacker.example.com"),
         ("domain", "https://evil-attacker.example.com/login", "evil-attacker.example.com"),
         ("domain", "evil[.]malicious[.]org", "evil.malicious.org"),
-        ("url", "https://malicious.example.com/payload.sh", "https://malicious.example.com/payload.sh"),
+        (
+            "url",
+            "https://malicious.example.com/payload.sh",
+            "https://malicious.example.com/payload.sh",
+        ),
         ("url", "evil-attacker.example.com/login", "https://evil-attacker.example.com/login"),
         ("url", "hxxps://evil[.]org/malware.exe", "https://evil.org/malware.exe"),
         ("ip", "198.51.100.23", "198.51.100.23"),
         ("ip", "198.51.100[.]23", "198.51.100.23"),
         ("ip", "198.51.100.23:8080", "198.51.100.23"),
-        ("hash", "44d88612fea8a8f36de82e1278abb02f", "44d88612fea8a8f36de82e1278abb02f"),
-        ("hash", "MD5: 44D88612FEA8A8F36DE82E1278ABB02F", "44d88612fea8a8f36de82e1278abb02f"),
+        (
+            "hash",
+            "44d88612fea8a8f36de82e1278abb02f",  # pragma: allowlist secret
+            "44d88612fea8a8f36de82e1278abb02f",  # pragma: allowlist secret
+        ),  # pragma: allowlist secret
+        (
+            "hash",
+            "MD5: 44D88612FEA8A8F36DE82E1278ABB02F",  # pragma: allowlist secret
+            "44d88612fea8a8f36de82e1278abb02f",  # pragma: allowlist secret
+        ),  # pragma: allowlist secret
         ("log", "access.log", "access.log"),
         ("pcap", "traffic.pcap", "traffic.pcap"),
         ("file", "suspicious.exe", "suspicious.exe"),
-        ("description", "Multiple failed ssh logins followed by root elevation", "Multiple failed ssh logins followed by root elevation"),
+        (
+            "description",
+            "Multiple failed ssh logins followed by root elevation",
+            "Multiple failed ssh logins followed by root elevation",
+        ),
     ]
 
     for target_type, input_val, expected_val in targets:
@@ -174,7 +208,9 @@ async def test_investigation_creation_all_target_types(
             },
             headers=auth_headers[Role.INVESTIGATOR],
         )
-        assert resp.status_code == 201, f"Failed for {target_type} with input '{input_val}': {resp.text}"
+        assert resp.status_code == 201, (
+            f"Failed for {target_type} with input '{input_val}': {resp.text}"
+        )
         data = resp.json()
         assert data["target_type"] == target_type
         assert data["target_value"] == expected_val
@@ -198,4 +234,3 @@ async def test_investigation_validation_error_formatting(
     assert err_body["code"] == "validation_error"
     assert "domain label" in err_body["message"]
     assert "contains invalid characters" in err_body["message"]
-

@@ -64,8 +64,9 @@ class AgentRegistry:
 def build_default_registry() -> AgentRegistry:
     """The agents available in this milestone.
 
-    Phase 4 adds the network, endpoint, malware, and threat-intelligence adapters,
-    and Phase 7 adds the hypothesis agents; each registers here once its tools exist.
+    The registry contains the agents available in the current deployment. Endpoint
+    forensics, live malware analysis, and external threat-intelligence agents are
+    intentionally absent until their isolation and provider boundaries exist.
     """
     registry = AgentRegistry()
     registry.register(TriageAgent())

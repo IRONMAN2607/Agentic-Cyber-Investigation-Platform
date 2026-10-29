@@ -67,7 +67,9 @@ indicator to VirusTotal discloses it to a third party. That has real operational
 a live incident, so T3 tools require explicit configuration and are logged as disclosure events. See
 [threat-model.md](threat-model.md).
 
-**Currently implemented: T0 only.** `auth_log_parser` and `ioc_extractor`, both pure Python.
+**Currently registered: T0 only.** The auth-log parser, web-log parser, PCAP parser, IOC extractor,
+and local deterministic threat-intelligence feed all run in-process over bounded data. The standalone
+subprocess helper is not a substitute for a tested T1/T2 deployment boundary.
 
 ### Security execution profile (required before any tier above T0)
 
@@ -95,6 +97,9 @@ This satisfies §12 and supplies the tool-latency and tool-selection-accuracy me
 | `auth_log_parser` | `auth_event`, `privilege_event`, `session_event` | Linux auth logs; BSD syslog and ISO-8601 forms |
 | `web_server_log_parser` | `web_request`, `web_attack` | Nginx, Apache, W3C CLF/Combined access logs; SQLi, LFI, RCE, web shells, scanners |
 | `ioc_extractor` | `ioc` | IPs, domains, URLs, hashes, users, hosts, ports, paths, emails |
+| `web_server_log_parser` | `web_request`, `web_attack` | Nginx, Apache, and W3C access logs with deterministic attack rules |
+| `pcap_parser` | `network_flow`, `dns_query`, `ioc` | Bounded pure-Python PCAP/PCAPNG dissection; no binary execution |
+| `threat_intel` | `threat_intel` | Local synthetic evaluation feed; no external provider is contacted |
 
 ### Planned
 

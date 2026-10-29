@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import pytest
+from fastapi import Request
 from httpx import AsyncClient
 
 from acip.core.security.ratelimit import (
+    RateLimitExceededError,
     SlidingWindowRateLimiter,
     investigation_limiter,
     login_limiter,
+    rate_limit,
 )
 from acip.types import Role
 
@@ -21,13 +24,36 @@ def test_sliding_window_rate_limiter_unit() -> None:
     limiter.check(key)
 
     # 4th request within window raises
-    from acip.core.security.ratelimit import RateLimitExceededError
-
     with pytest.raises(RateLimitExceededError) as exc_info:
         limiter.check(key)
 
     assert exc_info.value.status_code == 429
     assert exc_info.value.detail["retry_after"] >= 1
+
+
+def test_rate_limit_does_not_trust_forwarded_for() -> None:
+    limiter = SlidingWindowRateLimiter(max_requests=1, window_seconds=60)
+    dependency = rate_limit(limiter)
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [(b"x-forwarded-for", b"198.51.100.10")],
+            "client": ("127.0.0.1", 8000),
+            "scheme": "http",
+        }
+    )
+
+    dependency(request)
+    spoofed_request = Request(
+        {**request.scope, "headers": [(b"x-forwarded-for", b"198.51.100.11")]}
+    )
+    with pytest.raises(RateLimitExceededError):
+        dependency(spoofed_request)
+
+    # A genuinely different peer still has an independent bucket.
+    dependency(Request({**request.scope, "client": ("127.0.0.2", 8000)}))
 
 
 async def test_auth_login_rate_limiting(client: AsyncClient) -> None:

@@ -25,15 +25,22 @@ logger = get_logger(__name__)
 
 # Combined Log Format: IP ident user [timestamp] "request" status bytes "referer" "user_agent"
 # Common Log Format (CLF) is the prefix without referer and user_agent.
+# Also accommodates syslog/journald/RFC-5424 prefixed lines
+# (e.g. "2026-10-14T... host proc[pid]: IP ...")
 _LOG_PATTERN = re.compile(
-    r"^(?P<ip>[\da-fA-F:.]+)\s+"
+    r"^(?:(?P<syslog_time>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?"
+    r"(?:Z|[+-]\d{2}:?\d{2})?|[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+"
+    r"(?P<syslog_host>[\w.\-]+)\s+"
+    r"(?P<syslog_proc>[\w.\-/]+?)(?:\[(?P<syslog_pid>\d+)\])?:\s+)?"
+    r"(?P<ip>[\da-fA-F:.]+)\s+"
     r"(?P<ident>\S+)\s+"
     r"(?P<user>\S+)\s+"
-    r"\[(?P<time>[^\]]+)\]\s+"
+    r"(?:\[(?P<time>[^\]]+)\]\s+)?"
     r'"(?P<request>[^"]*)"\s+'
     r"(?P<status>\d{3})\s+"
     r"(?P<bytes>\S+)"
     r'(?:\s+"(?P<referer>[^"]*)"\s+"(?P<user_agent>[^"]*)")?'
+    r"(?:\s+(?P<extra>.*))?$"
 )
 
 _MONTHS = {
@@ -171,7 +178,8 @@ class WebServerLogParser(ToolAdapter):
             ident = match.group("ident")
             user = match.group("user")
             user_clean = None if user == "-" else user
-            time_str = match.group("time")
+            time_str = match.group("time") or match.group("syslog_time")
+            extra_str = match.group("extra")
             req_str = match.group("request")
             status_code = int(match.group("status"))
             bytes_raw = match.group("bytes")
@@ -195,6 +203,7 @@ class WebServerLogParser(ToolAdapter):
                     query_string=query_string,
                     req_str=req_str,
                     user_agent=user_agent or "",
+                    extra=extra_str,
                 )
                 if attacks_detected:
                     attacks_count += len(attacks_detected)
@@ -257,8 +266,10 @@ class WebServerLogParser(ToolAdapter):
         )
 
 
-def _parse_timestamp(time_str: str) -> tuple[dt.datetime | None, TimeConfidence]:
-    """Parse Common/Combined Log Format timestamp e.g. 10/Mar/2026:03:10:55 +0000."""
+def _parse_timestamp(time_str: str | None) -> tuple[dt.datetime | None, TimeConfidence]:
+    """Parse Common/Combined Log Format, ISO-8601, or BSD syslog timestamp."""
+    if not time_str:
+        return None, TimeConfidence.UNKNOWN
     try:
         # Format: 10/Mar/2026:03:10:55 +0000 or 10/Mar/2026:03:10:55
         parts = time_str.split(" ")
@@ -295,6 +306,18 @@ def _parse_timestamp(time_str: str) -> tuple[dt.datetime | None, TimeConfidence]
                 return parsed_iso.replace(tzinfo=dt.UTC), TimeConfidence.DERIVED
             return parsed_iso.astimezone(dt.UTC), TimeConfidence.EXACT
         except Exception:
+            # Fallback to BSD syslog e.g. "Oct 14 22:14:02"
+            try:
+                b_parts = time_str.split()
+                if len(b_parts) == 3 and b_parts[0] in _MONTHS:
+                    mon = _MONTHS[b_parts[0]]
+                    day = int(b_parts[1])
+                    h, m, s = map(int, b_parts[2].split(":"))
+                    now = dt.datetime.now(dt.UTC)
+                    parsed_bsd = dt.datetime(now.year, mon, day, h, m, s, tzinfo=dt.UTC)
+                    return parsed_bsd, TimeConfidence.DERIVED
+            except (ValueError, KeyError, IndexError):
+                pass
             return None, TimeConfidence.UNKNOWN
 
 
@@ -321,6 +344,7 @@ def _detect_attacks(
     query_string: str | None,
     req_str: str,
     user_agent: str,
+    extra: str | None = None,
 ) -> list[dict[str, str]]:
     """Evaluate deterministic attack signatures across request components."""
     detected: list[dict[str, str]] = []
@@ -339,6 +363,9 @@ def _detect_attacks(
         ("decoded_query", decoded_query),
         ("request_line", req_str),
     ]
+    if extra:
+        search_targets.append(("payload", extra))
+        search_targets.append(("decoded_payload", urllib.parse.unquote_plus(extra)))
 
     for cat, pattern in _ATTACK_SIGNATURES:
         if cat == "scanner":

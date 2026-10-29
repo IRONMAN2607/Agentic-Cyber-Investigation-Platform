@@ -20,14 +20,18 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 
 ## Status
 
-**Phases 0–8 verified. Phase 5 (Evidence Graph & Correlation Engine), Phase 6 (Model Abstraction & Reasoning Provider), Phase 7 (Reasoning Agents, Adversarial Validation & Adaptive Planning), and Phase 8 (Frontend Expansion: Evidence Graph, Interactive Timeline, Hypotheses & Validation Panel, Real-time SSE streaming, Honest Limitations Modal) are complete. Phase 9 (Evaluation & Benchmark Harness) is unblocked.** [docs/roadmap.md](docs/roadmap.md) is the authority on phase numbering.
+**Phases 0–10 are implemented and locally verified.** The supported product boundary remains one
+trusted developer on localhost with synthetic or sanitised data. Phase 9's benchmark harness and
+Phase 10's reproducibility runner are available, while external provider, container-isolation, and
+multi-user deployment work remains outside that boundary. [docs/roadmap.md](docs/roadmap.md) is the
+authority on phase numbering.
 
 | Quality Gate | Status |
 |---|---|
-| Tests | **211 tests passing** across `unit/`, `integration/`, `api/`, `security/`, and `scenarios/` |
+| Tests | **244 tests passing** across `unit/`, `integration/`, `api/`, `security/`, `scenarios/`, and `evaluation/` |
 | Lint | **0 ruff errors** (`ruff check src tests`) |
-| Formatting | **100% formatted** across 144 files (`ruff format --check src tests`) |
-| Types | **0 mypy errors** across 144 source files (`mypy src tests`) |
+| Formatting | **100% formatted** across 152 files (`ruff format --check src tests`) |
+| Types | **0 mypy errors** across 152 source files (`mypy src tests`) |
 | Vertical slice | **100% verified end to end** with SQLite database, real auth and web attacks, clean baselines, MITRE mapping, graph reasoning, and hypothesis generation |
 | Orchestrator Agent & Planner | `OrchestratorAgent` coordinates lifecycle, `AdaptivePlanner` dynamically plans investigative workflows based on artifact types, tool capabilities, and investigation progression |
 | Reasoning & Validation Agents | `HypothesisAgent` (competing explanations with Invariant G3 refutation conditions and gap detection), `ReasoningAgent` (multi-hop graph attack chain synthesis), `ValidationAgent` (adversarial review with bounded execution loops), Risk assessment with attributed model opinion |
@@ -35,8 +39,8 @@ tool. See [docs/evidence-model.md](docs/evidence-model.md).
 | Frontend Workspace | **Interactive multi-tab dashboard** in `web/` served directly by FastAPI: Evidence Graph SVG canvas, Correlated Forensic Timeline, Competing Hypotheses & Validation, Server-Sent Events (SSE) streaming with polling fallback, honest capabilities & limitations disclosure modal |
 | Security Invariants | Grounding invariants G0–G4, Invariant G7 (MITRE ATT&CK catalog bounds), append-only immutability (incl. bulk DML), provenance integrity, token safety, role authz matrix, request rate limits, anti-SSRF protection, magic-byte intake validation, T1 sandbox isolation (no `shell=True`) |
 | Model Abstraction & Routing | `ModelRouter`, `RoutingPolicy`, OpenAI-compatible `NvidiaNIMProvider` (Nemotron, DeepSeek R1), local `CyberReasoningProvider` dynamic evaluation engine, Pydantic structured output repair, deterministic `ReplayProvider` test double |
-| Active Phase 4 Capabilities | Deterministic Web Server Access Log Parser (`web_server_log_parser`), Linux Auth Log Parser (`auth_log_parser`), PCAP Packet Capture Parser (`pcap_parser`), Threat Intelligence adapter (`threat_intel`), IOC Extractor (`ioc_extractor`), MITRE ATT&CK Mapping Agent (`mitre`), Tier 1 Subprocess Sandbox |
-| Active Focus (Phase 9) | Evaluation harness: benchmark datasets, baselines A–C, ablations 1–4, and reproduction runner |
+| Implemented deterministic capabilities | Linux auth, web access-log, and PCAP parsers; IOC extraction; MITRE mapping; evidence graph correlation; hypotheses and validation; local synthetic threat-intelligence feed |
+| Remaining deployment gaps | Container isolation, external threat-intelligence providers, object-level authorization, distributed rate limiting, token revocation, and live malware handling |
 
 `GET /capabilities` and `acip capabilities` report what this deployment can actually do, and
 `src/acip/core/limitations.py` is the single source for what it cannot. Both are wired into the
@@ -57,6 +61,17 @@ cp .env.example .env
 ```bash
 .venv/Scripts/python.exe -m acip.cli init
 ```
+
+To populate the local workspace with one high-risk and one low-risk example for
+every supported investigation target type, run the real pipeline over the
+synthetic demo catalog:
+
+```bash
+.venv/Scripts/python.exe -m acip.cli seed-samples
+```
+
+See [docs/sample-investigations.md](docs/sample-investigations.md) for the
+catalog and the `--no-run` option.
 
 ```bash
 .venv/Scripts/python.exe -m acip.cli serve

@@ -86,13 +86,17 @@ def test_validate_target_value_routing() -> None:
     )
     assert (
         validate_target_value(
-            TargetType.HASH, "SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            TargetType.HASH,
+            "SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         )
         == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
     assert validate_target_value(TargetType.LOG, "auth.log") == "auth.log"
     assert validate_target_value(TargetType.PCAP, "traffic.pcap") == "traffic.pcap"
-    assert validate_target_value(TargetType.DESCRIPTION, "Suspicious SSH login") == "Suspicious SSH login"
+    assert (
+        validate_target_value(TargetType.DESCRIPTION, "Suspicious SSH login")
+        == "Suspicious SSH login"
+    )
 
 
 def test_detect_magic_bytes_pcap() -> None:

@@ -92,26 +92,26 @@ class AdaptivePlanner:
             )
             step += 1
 
-            # MITRE mapping for detection rules
-            if self._registry.has("mitre"):
-                tasks.append(
-                    Task(
-                        task_id=f"t{step}-mitre",
-                        agent_name="mitre",
-                        rationale=(
-                            "Maps deterministic detection rule findings directly to verified "
-                            "MITRE ATT&CK Enterprise tactics and techniques (Invariant G7)."
-                        ),
-                    )
-                )
-                step += 1
-
         if has_pcap and self._registry.has("network_analysis"):
             tasks.append(
                 Task(
                     task_id=f"t{step}-network-analysis",
                     agent_name="network_analysis",
                     rationale="Packet capture artifact present; extracting flows and DNS queries.",
+                )
+            )
+            step += 1
+
+        # MITRE mapping for detection rules from triage, log, or web analysis
+        if self._registry.has("mitre"):
+            tasks.append(
+                Task(
+                    task_id=f"t{step}-mitre",
+                    agent_name="mitre",
+                    rationale=(
+                        "Maps deterministic detection rule findings directly to verified "
+                        "MITRE ATT&CK Enterprise tactics and techniques (Invariant G7)."
+                    ),
                 )
             )
             step += 1
